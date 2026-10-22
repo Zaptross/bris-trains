@@ -9,6 +9,14 @@
 .fresh { min-width: 0; text-align: right; }
 .main { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: var(--space-4); }
 .footer { padding: var(--space-4); text-align: center; font-size: var(--fs-sm); color: var(--fg-faint); border-top: 1px solid var(--border); }
-.footer a { color: var(--fg-muted); }
+/* Inline, but still a 44 px touch target: a 44 px line box, with a negative
+   vertical margin so the footer's text line keeps its height. */
+.footer a {
+  color: var(--fg-muted);
+  display: inline-block;
+  min-height: var(--touch, 44px);
+  line-height: var(--touch, 44px);
+  margin: calc((1lh - var(--touch, 44px)) / 2) 0;
+}
 /* Schedule-only: mute every chromatic accent. */
 .degraded .main { filter: saturate(0.35); }
