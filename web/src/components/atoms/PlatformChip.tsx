@@ -3,20 +3,20 @@ import styles from "./PlatformChip.module.css";
 /** Props for PlatformChip. */
 export interface PlatformChipProps {
   platform: string | null;
+  /**
+   * "chip" (default) is a boxed label for the departure board; "inline" is
+   * plain text that reads as part of a time line ("08:58 · Platform 1").
+   */
+  variant?: "chip" | "inline";
 }
 
-/** "P2"; an em dash when the platform is unknown. */
-export function PlatformChip({ platform }: PlatformChipProps) {
-  if (platform === null || platform === "") {
-    return (
-      <span className={`${styles.chip} ${styles.none}`} aria-label="platform unknown">
-        —
-      </span>
-    );
-  }
+/** "Platform 2"; "Platform —" when the platform is unknown. */
+export function PlatformChip({ platform, variant = "chip" }: PlatformChipProps) {
+  const known = platform !== null && platform !== "";
+  const cls = [styles[variant], known ? "" : styles.none].filter(Boolean).join(" ");
   return (
-    <span className={styles.chip} aria-label={`platform ${platform}`}>
-      P{platform}
+    <span className={cls} aria-label={known ? `platform ${platform}` : "platform unknown"}>
+      Platform {known ? platform : "—"}
     </span>
   );
 }

@@ -1,6 +1,9 @@
 .chip {
-  display: inline-block; min-width: 2.6em; text-align: center; padding: 1px 4px;
+  display: inline-block; padding: 1px 6px;
   font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--fs-sm);
   border: 1px solid var(--border); border-radius: 4px; background: var(--surface-2); white-space: nowrap;
 }
+/* Plain text on a time line, separated from the time by a middle dot. */
+.inline { font-size: var(--fs-sm); color: var(--fg-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.inline::before { content: "·"; margin-right: var(--space-2); color: var(--fg-faint); }
 .none { color: var(--fg-faint); }

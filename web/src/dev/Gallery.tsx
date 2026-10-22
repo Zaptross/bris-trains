@@ -146,6 +146,8 @@ export function Gallery() {
           <PlatformChip platform="2" />
           <PlatformChip platform="10" />
           <PlatformChip platform={null} />
+          <PlatformChip platform="2" variant="inline" />
+          <PlatformChip platform={null} variant="inline" />
           <LineSwatch color="#D53E45" orientation="horizontal" />
           <LineSwatch color="00A8E5" orientation="horizontal" />
           <LineSwatch color="#008752" orientation="horizontal" />

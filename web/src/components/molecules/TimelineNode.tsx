@@ -69,7 +69,6 @@ export function TimelineNode({ call, isFirst, isLast, isBoard, isAlight, vehicle
       <span className={styles.content}>
         <span className={styles.head}>
           <span className={`${styles.name} ${unknown ? styles.unknown : ""}`}>{call.name}</span>
-          <PlatformChip platform={call.platform} />
           {isBoard && <Badge tone="info">board</Badge>}
           {isAlight && <Badge tone="info">alight</Badge>}
           {skipped && <Badge tone="bad">✕ not stopping</Badge>}
@@ -99,6 +98,7 @@ export function TimelineNode({ call, isFirst, isLast, isBoard, isAlight, vehicle
                 ~ estimated
               </span>
             )}
+            <PlatformChip platform={call.platform} variant="inline" />
           </span>
         )}
       </span>
