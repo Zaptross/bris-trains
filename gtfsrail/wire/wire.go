@@ -115,6 +115,8 @@ const (
 	ErrUnknownStation = "unknown_station"
 	ErrNotFound       = "not_found"
 	ErrBadRequest     = "bad_request"
+	ErrMethod         = "method_not_allowed"
+	ErrInternal       = "internal"
 )
 
 type ErrorResponse struct {
@@ -128,6 +130,7 @@ type FeedHealth struct {
 	AgeSeconds  *int64  `json:"ageSeconds"`
 	LastError   *string `json:"lastError"`
 	Fetches     int64   `json:"fetches"`
+	NotModified int64   `json:"notModified"` // conditional GETs answered 304
 }
 
 type HealthResponse struct {
