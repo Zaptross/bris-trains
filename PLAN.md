@@ -119,8 +119,8 @@ interface ErrorResponse    { error: 'ambiguous' | 'unknown_station' | 'not_found
 - [x] **1.7** gob cache: write after parse, keyed by ETag; load path skips CSV entirely. Shared by both modes (§4.3): write to a temp file in the cache dir, then rename into place; on Windows, retry the rename briefly while another reader holds the file open, then keep the previous cache and log it
   - Done when: warm load measured and recorded (spec §3.3 target: query under 1 s end to end); a test that races readers against a writer in a loop never decodes a partial index
   - Measured on the full feed: cold parse 1.08 s; gob 7.74 MB (above the §3.3 "low single-digit MB" estimate — `Calling` is rebuilt on decode rather than stored, which halved it from 14.6 MB); **gob decode 32 ms**. Race test: 40 writes vs 191 concurrent decodes, zero partial reads.
-- [ ] **1.8** Fetcher: conditional `GET` with `If-None-Match`, atomic swap via `atomic.Pointer[Index]`, last-check timestamp beside the gob
-  - Done when: a second run issues a `304` and reuses the cache
+- [x] **1.8** Fetcher: conditional `GET` with `If-None-Match`, atomic swap via `atomic.Pointer[Index]`, last-check timestamp beside the gob
+  - Done when: a second run issues a `304` and reuses the cache — verified live: a backdated `meta.json` check made the next query revalidate in 337 ms; upstream answered `304` for the cached ETag, `checkedAt` advanced, and the gob was untouched. The swap is `Service.cur` (`atomic.Pointer[state]`), refreshed hourly in serve mode.
 - [x] **1.9** Full-feed check: `go test -tags live -run Live ./gtfsrail/internal/gtfs/` parses `scratch/SEQ_GTFS.zip`; `cmd/mkfixture` (P0) cuts the fixture
   - Done when: the live test reproduces §2.1 (584 / 9,919 / 248,021 / 154 / 359 / 667); station set equals `testdata/stations.csv`; `testdata/static.zip` committed
 
@@ -136,8 +136,8 @@ interface ErrorResponse    { error: 'ambiguous' | 'unknown_station' | 'not_found
 
 ## P2 — Realtime store (`gtfsrail/internal/gtfsrt`)
 
-- [ ] **2.1** Feed fetcher: conditional `GET`, `304` keeps the prior snapshot, per-feed last-success time
-  - Done when: `304` path exercised against the live feed
+- [x] **2.1** Feed fetcher: conditional `GET`, `304` keeps the prior snapshot, per-feed last-success time
+  - Done when: `304` path exercised against the live feed — `go test -tags live -run Live ./gtfsrail/internal/gtfsrt/`: back-to-back fetches got a `304` on all three feeds and kept the snapshot (12 trips). Translink rotates the ETag on every ~10 s republish, so 15 s polling rarely sees one.
 - [x] **2.2** Decode to immutable snapshots: TU by `trip_id`; VP by `trip_id`; alerts indexed by `route_id`, `trip_id`, `stop_id` (§2.3 — never `route_type`)
   - Done when: decodes the `cmd/capture` `.pb` files
 - [x] **2.3** Staleness (§3.4): VP > 120 s → `stale`; TU entirely > 60 min past → dropped; feed > 90 s since success → `degraded`
@@ -146,10 +146,10 @@ interface ErrorResponse    { error: 'ambiguous' | 'unknown_station' | 'not_found
   - Done when: the 9-window alert from §2.3 resolves correctly
 - [x] **2.5** Observation table `map[ObsKey]Obs`, upsert per STU per poll, reset at 03:00 Brisbane
   - Done when: rollover unit-tested at 02:59:59 and 03:00:00
-- [ ] **2.6** **Two run modes:** `Poll(ctx)` (serve mode: 15 s / 15 s / 60 s goroutines) and `FetchOnce(ctx, 5s)` (query mode: all three concurrently, §4.2)
-  - Done when: both covered by the P8 smoke runs
-- [ ] **2.7** `Health()`: per-feed last success, age, last error
-  - Done when: surfaced at `/api/healthz`
+- [x] **2.6** **Two run modes:** `Poll(ctx)` (serve mode: 15 s / 15 s / 60 s goroutines) and `FetchOnce(ctx, 5s)` (query mode: all three concurrently, §4.2)
+  - Done when: both covered by the P8 smoke runs — every query run uses `FetchOnce`; serve's `/api/healthz` showed 6 TripUpdates / 6 VehiclePositions / 2 Alerts fetches after ~75 s.
+- [x] **2.7** `Health()`: per-feed last success, age, last error
+  - Done when: surfaced at `/api/healthz` (also `fetches` and `notModified`)
 
 ---
 
@@ -178,7 +178,12 @@ The integration point and the highest-risk code. **Golden tests are written befo
 - [x] **4.5** `ADDED` synthesis from STUs alone; unknown stop IDs → `Unknown stop <id>` (§3.5)
 - [x] **4.6** Direct journeys across {yesterday, today, tomorrow}; sort by expected departure; `limit` (§3.5)
 - [x] **4.7** One-change routing over the 7 validated interchanges; 4-min minimum; `tight` < 5 min; a pairing eroded below 4 min by realtime is dropped and the next feasible second leg chosen; direct wins on ties (§3.6)
-- [ ] **4.8** `Service` facade: `Open(Config)` loads the cache or zip, wires the realtime mode, and runs stationlex validation (§3.2)
+- [x] **4.8** `Service` facade: `Open(Config)` loads the cache or zip, wires the realtime mode, and runs stationlex validation (§3.2)
+
+**Found by live testing and fixed (regression test for each, red before the fix):**
+
+- [x] **4.9** Translink stamps a post-midnight trip (24:02 on the 22nd's service) as `start_date` 20261023 `00:02:00`. Matching on `start_date` silently dropped its realtime. Runs are now matched by start instant within 12 h — `TestPostMidnightStartDateStamp`.
+- [x] **4.10** `REPLACEMENT` trips can be renumbered (D510 was re-sent with seq 1 = Central, which is static seq 21), and one sequence can carry two different stops. Sequence matches are now accepted only at the same station, and unanchored updates are matched by station. The observation table records the stop so a renumbered stop replaces rather than merges. In one live snapshot, 21 updates on `REPLACEMENT` trips were at a different station from their sequence — `TestRenumberedReplacement`, `TestUpdateAtWrongStationIgnored`.
 
 **Golden cases (§7)** — each a named test in `gtfsrail/golden_test.go` using `testdata/static.zip` plus a code-built `FeedMessage` decoded by the production decoder. Each 4.x task above is done when the golden cases covering it pass. Mutation check: making `SKIPPED` reset the carried delay fails G5, and dropping the 4-min minimum fails G10.
 
@@ -199,39 +204,39 @@ The integration point and the highest-risk code. **Golden tests are written befo
 
 ## P5 — Query mode (`cmd/trains`, `cmd/trains/query`)
 
-- [ ] **5.1** `cmd/trains/main.go` dispatch (§4.1): first argument exactly `serve` → serve mode, anything else → query mode. Created here with query mode wired; 6.1 adds the `serve` case
+- [x] **5.1** `cmd/trains/main.go` dispatch (§4.1): first argument exactly `serve` → serve mode, anything else → query mode. Created here with query mode wired; 6.1 adds the `serve` case
   - Done when: `trains central roma` reaches query mode; no arguments prints usage and exits 2; `--help` exits 0
-- [ ] **5.2** Query flags (§4.2), parsed iteratively so flags may sit before, between or after the station names; exactly two positional args; wrong count → exit 2 with the quoting example
-  - Done when: `trains central roma --json`, `trains --json central roma` and `trains central --json roma` produce identical output
-- [ ] **5.3** Wrong-mode flags: a serve flag given to a query (e.g. `--addr`) errors with a pointer to `trains serve`, using the flag names serve mode exports (6.1)
+- [x] **5.2** Query flags (§4.2), parsed iteratively so flags may sit before, between or after the station names; exactly two positional args; wrong count → exit 2 with the quoting example
+  - Done when: `trains central roma --json`, `trains --json central roma` and `trains central --json roma` produce identical output — live: identical SHA-256 with only `generatedAt`/`dataAgeSeconds` masked
+- [x] **5.3** Wrong-mode flags: a serve flag given to a query (e.g. `--addr`) errors with a pointer to `trains serve`, using the flag names serve mode exports (6.1)
   - Done when: `trains central roma --addr :8080` exits 2 with that hint. Verifiable only once 6.1 exports serve's flag names; until then an unknown flag is a plain usage error
-- [ ] **5.4** Table renderer: fixed columns, glyph legend, inline `ChangeSummary` for two-leg rows, `○` distinct from `●`
+- [x] **5.4** Table renderer: fixed columns, glyph legend, inline `ChangeSummary` for two-leg rows, `○` distinct from `●`
   - Done when: output matches the §4.2 layout
-- [ ] **5.5** Colour via ANSI, auto-disabled when stdout is not a terminal, or with `--no-color`
-  - Done when: piping to a file yields no escape codes
-- [ ] **5.6** `--json` emits `wire.JourneysResponse` — one schema for query mode and HTTP
-- [ ] **5.7** Exit codes 0 / 1 / 2 (§4.2); schedule-only banner on realtime failure
-  - Done when: verified by running with the network blocked
-- [ ] **5.8** Freshness header: `(live, 7s old)` / `(schedule only)`
-- [ ] **5.9** Pass the subcommand names to `stationlex.Validate` (3.4) at startup
-  - Done when: a test lexicon containing a station named "Serve" produces the collision warning
+- [x] **5.5** Colour via ANSI, auto-disabled when stdout is not a terminal, or with `--no-color`
+  - Done when: piping to a file yields no escape codes (0 `ESC` bytes); on Windows consoles virtual-terminal processing is enabled via `SetConsoleMode`
+- [x] **5.6** `--json` emits `wire.JourneysResponse` — one schema for query mode and HTTP
+- [x] **5.7** Exit codes 0 / 1 / 2 (§4.2); schedule-only banner on realtime failure
+  - Done when: verified by running with the network blocked (`HTTPS_PROXY` to a dead port → banner, exit 1)
+- [x] **5.8** Freshness header: `(live, 7s old)` / `(schedule only)`
+- [x] **5.9** Pass the subcommand names to `stationlex.Validate` (3.4) at startup
+  - Done when: a test lexicon containing a station named "Serve" produces the collision warning (stationlex tests; query and serve pass `ReservedWords: ["serve"]`)
 
 ---
 
 ## P6 — Serve mode (`cmd/trains/serve`)
 
-- [ ] **6.1** `serve.Run` entry point; add the `serve` case to the 5.1 dispatcher; export serve's flag names for 5.3's wrong-mode hint, and give the reverse hint when a query flag reaches serve mode
+- [x] **6.1** `serve.Run` entry point; add the `serve` case to the 5.1 dispatcher; export serve's flag names for 5.3's wrong-mode hint, and give the reverse hint when a query flag reaches serve mode
   - Done when: `trains serve --help` exits 0 and lists only serve flags; `trains serve --json` exits 2 pointing at query mode
-- [ ] **6.2** Serve flags (§5): `--addr` (default `localhost:8080`), `--dev`, `--cache`
-  - Done when: default listens on loopback only; `--addr :8080` is reachable from another device on the LAN
-- [ ] **6.3** Endpoints per §5 with the P0 DTOs and error shape
-- [ ] **6.4** `Cache-Control` per endpoint (§5)
-- [ ] **6.5** Serve `web.FS` at `/` with `index.html` fallback for UI routes (`/`, `/trip/*`) only; `/api/*` never falls back; "UI not built" page when `dist` holds only `.gitkeep`
-  - Done when: deep link to `/trip/…` loads on refresh; `/api/nope` returns a JSON `404`, not HTML
-- [ ] **6.6** `--dev`: CORS for the Vite origin; Vite proxies `/api` to `trains serve` in dev, so CORS is a fallback only
-- [ ] **6.7** Graceful shutdown with pollers bound to the server's context; exit `0` on clean shutdown, `1` on bind or startup failure (§5)
-  - Done when: Ctrl-C exits 0; starting a second instance on a taken port exits 1
-- [ ] **6.8** Load check (§7): 50 concurrent `/api/journeys` → upstream fetch count unchanged
+- [x] **6.2** Serve flags (§5): `--addr` (default `localhost:8080`), `--dev`, `--cache`
+  - Done when: default listens on loopback only (`127.0.0.1:8080`); `--addr :8090` bound `0.0.0.0` and `[::]` and answered 200 on a non-loopback interface address. A different physical device is the manual 8.5 phone check.
+- [x] **6.3** Endpoints per §5 with the P0 DTOs and error shape
+- [x] **6.4** `Cache-Control` per endpoint (§5)
+- [x] **6.5** Serve `web.FS` at `/` with `index.html` fallback for UI routes (`/`, `/trip/*`) only; `/api/*` never falls back; "UI not built" page when `dist` holds only `.gitkeep`
+  - Done when: deep link to `/trip/…` loads on refresh; `/api/nope` returns a JSON `404`, not HTML (live: `404 application/json`)
+- [x] **6.6** `--dev`: CORS for the Vite origin; Vite proxies `/api` to `trains serve` in dev, so CORS is a fallback only
+- [x] **6.7** Graceful shutdown with pollers bound to the server's context; exit `0` on clean shutdown, `1` on bind or startup failure (§5)
+  - Done when: Ctrl-C exits 0 (a real `CTRL_BREAK` console event: exit 0 in 4 ms); starting a second instance on a taken port exits 1
+- [x] **6.8** Load check (§7): 50 concurrent `/api/journeys` → upstream fetch count unchanged
   - Done when: counted via `Health()` fetch counters
 
 ---
@@ -243,7 +248,7 @@ The integration point and the highest-risk code. **Golden tests are written befo
 Built against typed fixture objects conforming to `web/src/api/types.ts`, so every state (late, skipped, stale, degraded, tight change) is exercisable before the backend exists.
 
 - [x] **7a.1** Design tokens as CSS custom properties: near-black board background, high-contrast foreground, amber/green/red status palette, `font-variant-numeric: tabular-nums` for every time, a monospace stack for times and platforms. `route_color` is injected per row as `--line` and is the only per-route colour
-- [ ] **7a.2** Mobile-first layout rules: designed at 360 px wide first; touch targets ≥ 44 px; two panes at ≥ 900 px
+- [x] **7a.2** Mobile-first layout rules: designed at 360 px wide first; touch targets ≥ 44 px; two panes at ≥ 900 px — measured in the production build: all 11 interactive elements ≥ 44 px (the footer attribution links were 17 px and were fixed); two panes at 1280 px; single column and `scrollWidth` 390 at 390 px
 - [x] **7a.3** Atoms (§6.1): `Text`, `Badge`, `StatusDot`, `Spinner`, `TimeLabel`, `Countdown`, `DelayChip`, `PlatformChip`, `LineSwatch`, `Button`, `Input`
 - [x] **7a.4** `StationPicker` — combobox, keyboard + touch, same tiers as P3 run client-side over `/api/stations`
 - [x] **7a.5** `JourneyRow` + `ChangeSummary` (including tight-state styling)
@@ -253,14 +258,14 @@ Built against typed fixture objects conforming to `web/src/api/types.ts`, so eve
 
 ### P7b — screens (after P6; develop against `trains serve` via the Vite proxy)
 
-- [ ] **7b.1** Data layer: TanStack Query; 15 s `refetchInterval`, `placeholderData: keepPreviousData`; `fetch` wrapper that maps `ErrorResponse` into typed errors
-- [ ] **7b.2** Routing: `react-router` — `/` and `/trip/:tripId?date=`. A two-leg journey links to the first leg, with a control to switch to the second
-- [ ] **7b.3** `JourneySearchForm` — swap control, `localStorage` persistence of the last pair
-- [ ] **7b.4** `DepartureBoard` — 5 rows, skeletons, empty and ambiguous states
-- [ ] **7b.5** `TripHeader` + `TripTimeline` (Position × Source rendering, §6.3)
-- [ ] **7b.6** `LineDiagram`: fetch `/api/shapes/{id}` once (immutable); equirectangular projection about the centroid into an SVG `viewBox`; station nodes from `calls`; vehicle dot at the nearest point on the polyline to the fix, or time-interpolated and labelled "estimated" when there is no fresh fix. Hidden when `shapeId` is null
-- [ ] **7b.7** Freshness always visible; muted palette when `degraded`
-- [ ] **7b.8** Attribution footer: "Data © Translink, licensed CC BY 4.0."
+- [x] **7b.1** Data layer: TanStack Query; 15 s `refetchInterval`, `placeholderData: keepPreviousData`; `fetch` wrapper that maps `ErrorResponse` into typed errors
+- [x] **7b.2** Routing: `react-router` — `/` and `/trip/:tripId?date=`. A two-leg journey links to the first leg, with a control to switch to the second
+- [x] **7b.3** `JourneySearchForm` — swap control, `localStorage` persistence of the last pair (the pair restored itself after reload)
+- [x] **7b.4** `DepartureBoard` — 5 rows, skeletons, empty and ambiguous states — each rendered in the production build by intercepting `/api/journeys`: ambiguous ("Matches: South Bank station, South Brisbane station"), unknown ("Did you mean…"), empty ("No trains in the next 24 hours"), and loading (5 skeletons)
+- [x] **7b.5** `TripHeader` + `TripTimeline` (Position × Source rendering, §6.3)
+- [x] **7b.6** `LineDiagram`: fetch `/api/shapes/{id}` once (immutable); equirectangular projection about the centroid into an SVG `viewBox`; station nodes from `calls`; vehicle dot at the nearest point on the polyline to the fix, or time-interpolated and labelled "estimated" when there is no fresh fix. Hidden when `shapeId` is null — both seen live: a fresh fix placed on the line as "live position" (run TRC8), and "estimated position (no live fix)" (run 1RC6)
+- [x] **7b.7** Freshness always visible; muted palette when `degraded`
+- [x] **7b.8** Attribution footer: "Data © Translink, licensed CC BY 4.0."
 
 ---
 
@@ -268,25 +273,27 @@ Built against typed fixture objects conforming to `web/src/api/types.ts`, so eve
 
 Each item is a run, not a test. Results are recorded in the final report.
 
-- [ ] **8.1** `go test ./...` and `go vet ./...` clean; `npm --prefix web run build` clean with strict TypeScript
-- [ ] **8.2** Query-mode live runs, compared by hand against Translink's journey planner in the same minute:
-  - [ ] `trains central roma`
-  - [ ] `trains roma central`
-  - [ ] `trains indooroopilly central`
-  - [ ] `trains "ferny grove" cleveland` (must show one-change rows)
-  - [ ] `trains south central` (must exit 2 listing South Bank and South Brisbane)
-- [ ] **8.3** Cold-start timing: warm-cache `trains central roma` under 1 s, measured
-- [ ] **8.4** Realtime failure: run with the realtime hosts unreachable → schedule-only banner, exit 1
-- [ ] **8.5** `trains serve` in a real browser, at a 390×844 viewport and at desktop width:
-  - [ ] pick stations
-  - [ ] watch the board refresh with no layout shift
-  - [ ] open a live trip
-  - [ ] confirm the marker advances across two or more polls and the line diagram renders
-  - [ ] reload on `/trip/…` and confirm the deep link loads
-  - [ ] from a real phone on the same network via `trains serve --addr :8080` (manual: needs your phone)
-- [ ] **8.6** Load check (P6.8) re-run against the final build
-- [ ] **8.7** Mode interplay: run `trains central roma` repeatedly while `trains serve` is starting and refreshing its index; no query fails or reads a partial cache
-- [ ] **8.8** README: build (`npm --prefix web ci && npm --prefix web run build && go build -o trains.exe ./cmd/trains`), both modes and their flags, data attribution, and a short explanation of the merge rules for whoever debugs a wrong time later
+- [x] **8.1** `go test ./...` and `go vet ./...` clean; `npm --prefix web run build` clean with strict TypeScript — also `go vet -tags live` and `gofmt -l` clean
+- [x] **8.2** Query-mode live runs at 06:35 on Fri 23 Oct (peak service), compared against Translink's own stop departure boards (`jp.translink.com.au/plan-your-journey/stops/<id>`, the data behind its journey planner) in the same minute:
+  - [x] `trains central roma` — all 5 trips match Translink's trip IDs, times and platforms: 39765129 and 39765255 (P5), 39765277 and 39765667 (P2), 39765724 (P1)
+  - [x] `trains roma central`
+  - [x] `trains indooroopilly central`
+  - [x] `trains "ferny grove" cleveland` (must show one-change rows) — 5 one-change rows via Central; every leg is a real trip at the stated platform on Translink's boards (39765116 at Ferny Grove P2, 39765060 at P1, 39765011 and 39765293 at Central P2). Translink also lists 39765726 (Ferny Grove 06:47); it reaches Cleveland at 08:35 via the same 07:32 connection as our 06:55 option, so leaving 8 min earlier for the same arrival is pruned by design
+  - [x] `trains south central` (must exit 2 listing South Bank and South Brisbane)
+- [x] **8.3** Cold-start timing: warm-cache `trains central roma` under 1 s, measured — 193–196 ms (769 ms on the first run after a fresh build, with the OS file cache cold)
+- [x] **8.4** Realtime failure: run with the realtime hosts unreachable → schedule-only banner, exit 1
+- [ ] **8.5** `trains serve` in a real browser, at a 390×844 viewport and at desktop width — every sub-check done except the real-phone one, which needs you:
+  - [x] pick stations (typed "central" / "roma" into the comboboxes)
+  - [x] watch the board refresh with no layout shift (5 rows, identical position and height across a live poll)
+  - [x] open a live trip
+  - [x] confirm the marker advances across two or more polls and the line diagram renders — run D510, sampled every 16 s: in transit toward Northgate, then `STOPPED_AT` Northgate (snapped onto the node), then advanced to the next stop after departure
+  - [x] reload on `/trip/…` and confirm the deep link loads
+  - [ ] from a real phone on the same network via `trains serve --addr :8080` (manual: needs your phone). Binding all interfaces and answering on a non-loopback address is verified; Windows Firewall may prompt on first use.
+- [x] **8.6** Load check (P6.8) re-run against the final build — live: 50 concurrent `/api/journeys` all 200 in 509 ms; upstream fetch counts 1/1/1 before and after
+- [x] **8.7** Mode interplay: run `trains central roma` repeatedly while `trains serve` is starting and refreshing its index; no query fails or reads a partial cache
+  - Cold cache, server and four query workers racing to download and write the index: 100/100 queries exit 0.
+  - Warm cache with a stale check time, so every process revalidates and rewrites `meta.json`: no query failed to read the index. 145 of 381 exited 1 only because Translink began answering **429 Too Many Requests** to the test's ~19 req/s. Each still printed the full timetable under the schedule-only banner; even a 429 on the static check fell back to the cached index.
+- [x] **8.8** README: build (`npm --prefix web ci && npm --prefix web run build && go build -o trains.exe ./cmd/trains`), both modes and their flags, data attribution, and a short explanation of the merge rules for whoever debugs a wrong time later
 
 ---
 
