@@ -49,7 +49,7 @@ export function JourneyRow({ journey, now, onSelect, degraded }: JourneyRowProps
           ) : (
             <>
               <StatusDot punctuality={journey.punctuality} delaySeconds={first.delaySeconds} showLabel />
-              {journey.punctuality === "onTime" && first.delaySeconds !== 0 && (
+              {journey.punctuality === "onTime" && Math.abs(first.delaySeconds) >= 30 && (
                 <DelayChip punctuality="onTime" delaySeconds={first.delaySeconds} />
               )}
             </>
@@ -57,7 +57,7 @@ export function JourneyRow({ journey, now, onSelect, degraded }: JourneyRowProps
         </span>
         <span className={styles.route}>
           {first.routeName}
-          <span className={styles.headsign}> → {first.headsign}</span>
+          <span className={styles.headsign}> → {first.headsign.replace(/ station$/i, "")}</span>
         </span>
         {journey.change && <ChangeSummary change={journey.change} />}
         <span className={styles.meta}>

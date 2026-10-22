@@ -1,0 +1,11 @@
+.boardTitle { margin: 0 0 var(--space-3); font-size: var(--fs-lg); }
+.hint { margin: 0; color: var(--fg-muted); }
+.error { margin: var(--space-3) 0; color: var(--bad); }
+.back { display: inline-flex; align-items: center; min-height: var(--touch); color: var(--fg-muted); text-decoration: none; font-weight: 600; }
+.back:hover { color: var(--fg); }
+.legs { display: flex; gap: var(--space-2); }
+.legTab {
+  display: inline-flex; align-items: center; min-height: var(--touch); padding: 0 var(--space-4);
+  border: 1px solid var(--border); border-radius: var(--radius); color: var(--fg-muted); text-decoration: none; font-weight: 600;
+}
+.legTab[aria-current="page"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }

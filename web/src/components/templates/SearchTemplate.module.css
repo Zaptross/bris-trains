@@ -1,0 +1,6 @@
+.grid { display: grid; gap: var(--space-5); }
+.search, .board { min-width: 0; }
+@media (min-width: 900px) {
+  .grid { grid-template-columns: minmax(300px, 380px) 1fr; align-items: start; }
+  .search { position: sticky; top: 68px; }
+}

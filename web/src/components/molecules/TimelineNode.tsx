@@ -12,6 +12,8 @@ export interface TimelineVehicle {
   /** 0..1 progress along the rail from the previous node to this one (IN_TRANSIT_TO / INCOMING_AT). */
   fraction: number;
   stale?: boolean;
+  /** No fresh fix: position interpolated on time between surrounding calls. */
+  estimated?: boolean;
 }
 
 /** Props for TimelineNode. */
@@ -55,9 +57,11 @@ export function TimelineNode({ call, isFirst, isLast, isBoard, isAlight, vehicle
         {!isFirst && <span className={styles.above} />}
         {!isLast && <span className={styles.below} />}
         <span className={styles.dot} />
-        {isCurrent && (
+        {isCurrent && vehicle && (
           <span
-            className={`${styles.marker} ${inTransit ? styles.transit : ""} ${vehicle?.stale ? styles.stale : ""}`}
+            className={[styles.marker, inTransit && styles.transit, vehicle?.stale && styles.stale, vehicle?.estimated && styles.guess]
+              .filter(Boolean)
+              .join(" ")}
             style={markerStyle}
           />
         )}
@@ -70,6 +74,7 @@ export function TimelineNode({ call, isFirst, isLast, isBoard, isAlight, vehicle
           {isAlight && <Badge tone="info">alight</Badge>}
           {skipped && <Badge tone="bad">✕ not stopping</Badge>}
           {isCurrent && vehicle?.stale && <Badge tone="warn">position stale</Badge>}
+          {isCurrent && vehicle?.estimated && <Badge tone="muted">~ estimated position</Badge>}
         </span>
         {!skipped && (
           <span className={styles.times}>

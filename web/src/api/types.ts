@@ -111,7 +111,13 @@ export interface StationsResponse {
   stations: Station[];
 }
 
-export type ErrorCode = "ambiguous" | "unknown_station" | "not_found" | "bad_request";
+export type ErrorCode =
+  | "ambiguous"
+  | "unknown_station"
+  | "not_found"
+  | "bad_request"
+  | "method_not_allowed"
+  | "internal";
 
 export interface ErrorResponse {
   error: ErrorCode;
@@ -124,6 +130,8 @@ export interface FeedHealth {
   ageSeconds: number | null;
   lastError: string | null;
   fetches: number;
+  /** Conditional GETs answered 304 (data unchanged upstream). */
+  notModified: number;
 }
 
 export interface HealthResponse {

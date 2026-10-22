@@ -1,0 +1,18 @@
+.figure { margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.svg { width: 100%; height: auto; max-height: 55vh; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.route { fill: none; stroke: var(--line); stroke-width: 8; stroke-linejoin: round; stroke-linecap: round; opacity: 0.35; }
+.done { fill: none; stroke: var(--line); stroke-width: 8; stroke-linejoin: round; stroke-linecap: round; }
+.node { fill: var(--bg); stroke: var(--line); stroke-width: 5; }
+.passed { fill: var(--line); }
+.skipped { stroke: var(--fg-faint); stroke-dasharray: 4 4; }
+.end { stroke: var(--fg); }
+.label { fill: var(--fg); font: 600 30px var(--font-sans); paint-order: stroke; stroke: var(--surface); stroke-width: 8px; }
+.halo { fill: var(--fg); opacity: 0.25; }
+.train { fill: var(--fg); stroke: var(--line); stroke-width: 5; }
+.vehicle circle { transition: cx 0.8s ease, cy 0.8s ease; }
+.vehicle .halo { animation: halo 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.estimated .train { fill: var(--bg); stroke: var(--fg); stroke-dasharray: 6 5; }
+.estimated .halo { opacity: 0; }
+@keyframes halo { 50% { transform: scale(1.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .vehicle .halo { animation: none; } .vehicle circle { transition: none; } }
+.caption { font-size: var(--fs-sm); color: var(--fg-muted); }

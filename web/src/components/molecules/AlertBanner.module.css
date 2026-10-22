@@ -12,3 +12,4 @@
 .header { display: block; }
 .desc { margin: 4px 0; color: var(--fg-muted); font-size: var(--fs-sm); white-space: pre-line; }
 .until { font-size: var(--fs-sm); color: var(--fg-faint); font-variant-numeric: tabular-nums; }
+.list[hidden] { display: none; }

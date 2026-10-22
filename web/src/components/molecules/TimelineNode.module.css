@@ -45,3 +45,4 @@
 .early { color: var(--info); }
 .note { font-size: var(--fs-sm); color: var(--fg-faint); }
 .estimated { font-size: var(--fs-sm); color: var(--sched); font-style: italic; border-bottom: 1px dotted var(--sched); }
+.guess { background: var(--bg); border: 3px dashed var(--fg); box-shadow: none; animation: none; }

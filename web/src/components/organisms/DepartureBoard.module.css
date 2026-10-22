@@ -1,0 +1,11 @@
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.skeleton {
+  height: 104px; border-radius: var(--radius); background: var(--surface);
+  background-image: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.04), transparent);
+  background-size: 200% 100%; animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+.state { padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.title { margin: 0 0 4px; font-weight: 650; }
+.detail { margin: 0; color: var(--fg-muted); font-size: var(--fs-sm); }
