@@ -2,7 +2,7 @@
 
 - **Status:** reviewed, decisions locked
 - **Date:** 2026-10-22
-- **Deliverables:** Go library `gtfsrail` + CLI `trains` + Go HTTP backend + TypeScript/React/Vite atomic-design UI, shipped as one binary
+- **Deliverables:** Go library `gtfsrail` + one `trains` binary (CLI queries by default, HTTP server via `trains serve`) + TypeScript/React/Vite atomic-design UI embedded in that binary
 - All numbers below were measured live against the real feeds on 2026-10-22 ~20:00 AEST. Reproduction commands live in `scratch/` (see appendix).
 
 ---
@@ -17,7 +17,7 @@
 | Journey display | **One row per journey**, change summarised inline |
 | Realtime history | **Whole service day in RAM**, cleared at the ~3am rollover (9.1 MB measured worst case) |
 | Map | **Timeline + inline SVG line diagram** from `shapes.txt`; no tile provider |
-| Deployment | **Single Go binary**, Vite build in `embed.FS` |
+| Deployment | **One Go binary, `trains`**: `trains <from> <to>` queries; `trains serve` runs the HTTP API + embedded UI |
 | Purpose | **A tool to actually catch trains** — optimise the daily path |
 | Aesthetic | **Departure board** — dark, high contrast, monospaced times, Translink route colours |
 | Target | **Mobile-first**, responsive to desktop |
@@ -202,8 +202,8 @@ graph TD
   B --> G[merge engine]
   D --> G
   D2 --> G
-  G --> H[trains CLI]
-  G --> I[HTTP API]
+  G --> H[trains: query mode]
+  G --> I[trains serve: HTTP API]
   I --> J[React UI, embedded]
 ```
 
@@ -223,13 +223,16 @@ gtfsrail/internal/gtfs/        static zip parse → rail index, gob cache
 gtfsrail/internal/gtfsrt/      realtime poll + decode + observation table
 gtfsrail/internal/stationlex/  fuzzy station name resolution
 gtfsrail/internal/geo/         Douglas–Peucker shape simplification (projection is the UI's job, §6.3)
-cmd/trains/                    CLI
-cmd/trainsd/                   HTTP backend + embedded UI
+cmd/trains/                    the one binary: argument dispatch only
+cmd/trains/query/              query mode: flags, table renderer, exit codes
+cmd/trains/serve/              serve mode: HTTP handlers, static UI, shutdown
 web/                           Vite + React + TS; web/embed.go exposes the build as embed.FS
 ```
 
-- `gtfsrail` is the library both tools consume, and the only package importable outside the module. The merge engine (§3.5) lives in it directly — it *is* the library's value. Parsing and polling are implementation details behind `internal/`.
-- `//go:embed` cannot reach parent directories, so the embed lives in `web/embed.go` (`package web`, `//go:embed all:dist`). `web/dist/.gitkeep` is committed so `go build` succeeds before the first frontend build; `trainsd` serves a "UI not built" page in that case.
+- `gtfsrail` is the library both modes consume, and the only package importable outside the module. The merge engine (§3.5) lives in it directly — it *is* the library's value. Parsing and polling are implementation details behind `internal/`.
+- Query and serve modes live in separate packages, so each can be built and tested independently; `cmd/trains/main.go` does nothing but dispatch (§4.1).
+- `//go:embed` cannot reach parent directories, so the embed lives in `web/embed.go` (`package web`, `//go:embed all:dist`). `web/dist/.gitkeep` is committed so `go build` succeeds before the first frontend build; `trains serve` serves a "UI not built" page in that case.
+- Embedding the UI does not slow queries: `embed.FS` data sits in the binary's read-only data section and is paged in only when a file is served.
 
 ### 3.3 `gtfsrail/internal/gtfs` — static rail index
 
@@ -459,11 +462,26 @@ Measured ambiguity in the real 154-station set:
 
 ---
 
-## 4. CLI — `trains`
+## 4. The `trains` binary
+
+One binary, two modes, chosen by the first argument. The everyday action is the bare command; the long-running mode is a named subcommand — the same split as `deno script.ts` / `deno run` and `hugo` / `hugo server`.
 
 ```
-trains <origin> <destination> [flags]
+trains <origin> <destination> [query flags]
+trains serve [serve flags]
+```
 
+### 4.1 Dispatch
+
+- If the first argument is exactly `serve`, run serve mode with the remaining arguments. Otherwise run query mode with all arguments.
+- Subcommand names are matched **before** station names, exact and case-sensitive. No station normalises to `serve` today. The binary passes its reserved subcommand names to the startup validation (§3.7, `Validate`), which warns if any station or alias would collide — so a future rename cannot silently become unreachable. The lexicon itself knows nothing about the CLI.
+- Each mode owns its flag set. A flag passed to the wrong mode is an error with a pointer to the right one (`--addr is a serve flag: trains serve --addr …`), not silently ignored.
+- No arguments prints both usage lines and exits `2`. An explicit `-h` / `--help` prints the same and exits `0`.
+- Flags may appear before, between or after the station names (`trains central roma --json`). Go's `flag` package stops at the first non-flag argument, so query mode parses iteratively: parse, take the next positional, resume parsing on the rest.
+
+### 4.2 Query mode — `trains <origin> <destination>`
+
+```
   -n, --count int       journeys to show (default 5)
       --at string       query time, RFC3339 or HH:MM (default now)
       --direct          suppress one-change options
@@ -497,17 +515,30 @@ One-change journeys only appear when no direct option arrives sooner (§3.6), so
 ```
 
 - `○ scheduled` is a distinct glyph from `● on time`, per §3.5.
-- Exactly two positional arguments. Multi-word stations are quoted: `trains "ferny grove" cleveland`. Any other argument count exits `2` with that example in the message.
-- Exit codes: `0` success; `2` ambiguous or unknown station (with candidates / nearest three suggestions); `1` feed unreachable — but the scheduled timetable still prints from cache under a `schedule only — realtime unavailable` banner.
+- Exactly two positional arguments. Multi-word stations are quoted: `trains "ferny grove" cleveland`. Any other count exits `2` with that example in the message.
+- Exit codes: `0` success; `2` usage error, or ambiguous/unknown station (with candidates / nearest three suggestions); `1` feed unreachable — but the scheduled timetable still prints from cache under a `schedule only — realtime unavailable` banner.
 - Cold start reads the gob index cache (§3.3), not the zip.
-- **No pollers in the CLI.** It fetches the three realtime feeds once, concurrently, with a 5 s overall timeout, answers, and exits. The observation table is therefore empty in CLI mode. That only affects calls a train has already passed, which a departure board never shows. Past the timeout, the board prints in schedule-only mode (exit `1`, as above).
-- The static index refreshes on CLI runs too: a conditional `GET` at most hourly, tracked by a timestamp beside the gob. A `304` costs one round trip; a changed feed is re-parsed before answering.
+- **No pollers in query mode.** It fetches the three realtime feeds once, concurrently, with a 5 s overall timeout, answers, and exits. The observation table is therefore empty. That only affects calls a train has already passed, which a departure board never shows. Past the timeout, the board prints in schedule-only mode (exit `1`, as above).
+- The static index refreshes on query runs too: a conditional `GET` at most hourly, tracked by a timestamp beside the gob. A `304` costs one round trip; a changed feed is re-parsed before answering.
+
+### 4.3 Shared cache between modes
+
+- Both modes read and write the same `os.UserCacheDir()/trains` index, so a query run while `trains serve` is up reuses the server's freshly parsed index and vice versa.
+- Writes go to a temp file in the same directory, then rename into place, so no process ever reads a half-written index. On Windows the rename fails while another process holds the file open; the writer retries briefly, then keeps the previous cache and logs it. Readers open, read fully, and close immediately to keep that window small.
 
 ---
 
-## 5. Backend — `trainsd`
+## 5. Serve mode — `trains serve`
 
-Single binary. `net/http`, JSON, Vite build served from `embed.FS` at `/`. Same `gtfsrail.Service` as the CLI — no logic duplicated, no CORS in production.
+```
+      --addr string     listen address (default localhost:8080)
+      --dev             enable CORS for the Vite dev server origin
+      --cache string    index cache dir (default os.UserCacheDir()/trains)
+```
+
+- Defaults to `localhost` so nothing is exposed by accident. To use the mobile-first UI from a phone on the same network, bind explicitly: `trains serve --addr :8080`.
+- `net/http`, JSON, Vite build served from `embed.FS` at `/`. Same `gtfsrail.Service` as query mode — no logic duplicated, no CORS in production.
+- Exit codes: `0` on clean shutdown (Ctrl-C / SIGTERM); `1` if the address cannot be bound or startup fails.
 
 | Method | Path | Returns |
 |---|---|---|
@@ -520,7 +551,8 @@ Single binary. `net/http`, JSON, Vite build served from `embed.FS` at `/`. Same 
 - Every payload carries `generatedAt` and `dataAge` so the UI renders truthful freshness rather than implying live data.
 - `Cache-Control: no-store` on journeys/legs; `max-age=3600` on stations; `max-age=86400` on shapes.
 - Background polling runs on a fixed cadence regardless of request volume: N concurrent browsers cause exactly 4 upstream requests per minute, not 4N.
-- `--dev` flag enables CORS for the Vite dev server origin.
+- `/api/*` never falls back to the UI: an unknown API path returns a JSON `404` (`ErrorResponse`), not `index.html` with a `200`. The `index.html` fallback applies only to UI routes (`/`, `/trip/*`).
+- In development the Vite dev server proxies `/api` to `trains serve`, so the frontend uses the same relative paths in both setups; `--dev` CORS is only a fallback.
 
 ---
 
@@ -586,7 +618,7 @@ Merge-engine cases, each drawn from a real observation above:
 **Live smoke test — the actual proof of delivery:**
 
 - `./trains central roma`, `./trains roma central`, `./trains indooroopilly central`, and a pair requiring a change such as `./trains "ferny grove" cleveland`; compare each against Translink's journey planner for the same minute.
-- Launch `trainsd`, drive both screens in a real browser at mobile viewport, confirm the timeline marker advances across successive polls and the line diagram renders.
+- Run `trains serve`, drive both screens in a real browser at mobile viewport, confirm the timeline marker advances across successive polls and the line diagram renders.
 - Cold-start timing: `trains central roma` from a warm index cache must return in under a second.
 
 **Load check:** 50 concurrent `/api/journeys` requests produce zero additional upstream fetches.
