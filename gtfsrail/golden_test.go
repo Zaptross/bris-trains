@@ -112,6 +112,13 @@ func (b *tuBuilder) delayed(delay int32, seqs ...uint16) *tuBuilder {
 	return b
 }
 
+// stamped overrides start_date/start_time, as the live feed sets them.
+func (b *tuBuilder) stamped(startDate, startTime string) *tuBuilder {
+	b.tu.Trip.StartDate = proto.String(startDate)
+	b.tu.Trip.StartTime = proto.String(startTime)
+	return b
+}
+
 func (b *tuBuilder) skipped(seqs ...uint16) *tuBuilder {
 	for _, seq := range seqs {
 		stop, _, _ := sched(b.t, b.ix, b.tu.Trip.GetTripId(), seq, b.date)
@@ -532,6 +539,30 @@ func TestG11DirectWinsTies(t *testing.T) {
 		if j.Change != nil {
 			t.Errorf("Central → Roma Street offered a change at %s", j.Change.Name)
 		}
+	}
+}
+
+// TestPostMidnightStartDateStamp reproduces a live observation: Translink
+// stamps run 1RC6, scheduled at 24:02 on Thursday's service, with start_date
+// 20261023 and start_time 00:02:00. Its realtime must still attach to
+// Thursday's run, and must not attach to a run a week later.
+func TestPostMidnightStartDateStamp(t *testing.T) {
+	ix := fixture(t)
+	const run1RC6 = "39764363-QR 26_27-44634-1RC6"
+	now := brisbane(thu.AddDays(1), 0, 10, 0)
+
+	live := newTU(t, ix, run1RC6, ix.Trips[run1RC6].RouteID, rtpb.TripDescriptor_SCHEDULED, thu).
+		delayed(90, 5, 6, 7).stamped("20261023", "00:02:00")
+	s := newService(ix, realtimeAt(t, now, []*tuBuilder{live}), func() time.Time { return now })
+	if c := callAt(t, leg(t, s, run1RC6, thu), 6); c.Source == Scheduled || c.Delay() != 90*time.Second {
+		t.Errorf("calendar-stamped update not applied: seq 6 source %v delay %v; want +90s realtime", c.Source, c.Delay())
+	}
+
+	weekLater := newTU(t, ix, run1RC6, ix.Trips[run1RC6].RouteID, rtpb.TripDescriptor_SCHEDULED, thu).
+		delayed(90, 5, 6, 7).stamped("20261030", "00:02:00")
+	s = newService(ix, realtimeAt(t, now, []*tuBuilder{weekLater}), func() time.Time { return now })
+	if c := callAt(t, leg(t, s, run1RC6, thu), 6); c.Source != Scheduled {
+		t.Errorf("an update for a run a week later attached to Thursday's run: source %v", c.Source)
 	}
 }
 

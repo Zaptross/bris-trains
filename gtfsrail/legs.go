@@ -64,11 +64,26 @@ func staticRaw(ix *gtfs.Index, t *gtfs.Trip, date Date) []rawCall {
 }
 
 // realtimeApplies reports whether realtime data for a trip describes the run
-// on this service date. Trip IDs repeat across the days a service runs, so a
-// trip update is only ours if its start_date matches; without a start_date we
-// accept it when the run is plausibly in progress.
+// on this service date. Trip IDs repeat across the days a service runs, so the
+// instance must be matched.
+//
+// Translink stamps a trip that starts after midnight with the calendar date
+// and a sub-24h start_time (start_date 20261023, start_time 00:02:00 for a
+// trip scheduled at 24:02:00 on the 22nd's service). Comparing start dates
+// alone would discard its realtime, or attach it to the wrong day's run, so
+// the start instant is compared instead. Runs of one trip are 24h apart, so
+// the nearest instance within 12h is unambiguous. Without a start_date the
+// update is accepted when the run is plausibly in progress.
 func (q *query) realtimeApplies(tu *gtfsrt.TripUpdate, date Date, raws []rawCall) bool {
 	if tu != nil && tu.StartDate != "" {
+		if tu.StartTime != "" && len(raws) > 0 {
+			sd, errD := ParseDate(tu.StartDate)
+			st, errT := gtfs.ParseSecs(tu.StartTime)
+			if errD == nil && errT == nil {
+				d := sd.Midnight(Brisbane).Add(secs(st)).Sub(raws[0].schedDep)
+				return d > -12*time.Hour && d < 12*time.Hour
+			}
+		}
 		return tu.StartDate == date.GTFS()
 	}
 	if len(raws) == 0 {
