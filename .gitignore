@@ -1,0 +1,15 @@
+# Research downloads and raw captures (re-fetchable, 36-46 MB each)
+scratch/*.zip
+scratch/*.pb
+scratch/*.err
+
+# Frontend
+node_modules/
+web/dist/*
+!web/dist/.gitkeep
+
+# Built binaries (root-anchored: a bare `trains` would also ignore cmd/trains/)
+/trains
+/trains.exe
+/trainsd
+/trainsd.exe
