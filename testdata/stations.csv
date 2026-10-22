@@ -1,0 +1,155 @@
+id,name,lat,lon
+place_albsta,Albion station,-27.429711,153.040259
+place_aldsta,Alderley station,-27.423431,153.000911
+place_altsta,Altandi station,-27.582693,153.063932
+place_ascsta,Ascot station,-27.429935,153.063500
+place_aucsta,Auchenflower station,-27.475996,152.996700
+place_balsta,Bald Hills station,-27.320729,153.011395
+place_bansta,Banoon station,-27.576409,153.046709
+place_baysta,Banyo station,-27.374743,153.077142
+place_beesta,Beenleigh station,-27.717573,153.204452
+place_bbrsta,Beerburrum station,-26.959863,152.958891
+place_bwrsta,Beerwah station,-26.857088,152.958486
+place_betsta,Bethania station,-27.687931,153.157951
+place_binsta,Bindha station,-27.382873,153.072416
+place_birsta,Birkdale station,-27.493704,153.218464
+place_parsta,Boggo Road station,-27.493302,153.030405
+place_bdlsta,Boondall station,-27.346387,153.067519
+place_bvlsta,Booval station,-27.609442,152.789870
+place_bowsta,Bowen Hills station,-27.445713,153.038071
+place_brasta,Bray Park station,-27.299627,152.985778
+place_bunsta,Bundamba station,-27.607189,152.804927
+place_brdsta,Buranda station,-27.496571,153.040586
+place_bursta,Burpengary station,-27.162215,152.957457
+place_cabstn,Caboolture station,-27.082646,152.953449
+place_cansta,Cannon Hill station,-27.465353,153.088976
+place_cassta,Carseldine station,-27.347367,153.028682
+place_censta,Central station,-27.466076,153.026320
+place_chesta,Chelmer station,-27.511948,152.972555
+place_clasta,Clayfield station,-27.418057,153.057470
+place_clesta,Cleveland station,-27.524498,153.265865
+place_cmrstn,Coomera station,-27.852922,153.317471
+place_cppsta,Coopers Plains station,-27.567080,153.035928
+place_crnsta,Cooran station,-26.334942,152.822922
+place_crysta,Cooroy station,-26.417914,152.911477
+place_coosta,Coorparoo station,-27.489086,153.055595
+place_corsta,Corinda station,-27.538950,152.980487
+place_daksta,Dakabin station,-27.230347,152.975517
+place_darsta,Darra station,-27.566121,152.952481
+place_deasta,Deagon station,-27.327508,153.063482
+place_dinsta,Dinmore station,-27.596208,152.833321
+place_domsta,Domestic Airport station,-27.384928,153.119077
+place_dbnsta,Doomben station,-27.431294,153.074765
+place_dupsta,Dutton Park station,-27.500603,153.028697
+place_egjsta,Eagle Junction station,-27.414958,153.050255
+place_eassta,East Ipswich station,-27.609875,152.774919
+place_ebbsta,Ebbw Vale station,-27.603538,152.822127
+place_edesta,Edens Landing station,-27.698286,153.170107
+place_elmsta,Elimbah station,-27.011262,152.945471
+place_enosta,Enoggera station,-27.420349,152.992402
+place_eudsta,Eudlo station,-26.725285,152.956990
+place_eumsta,Eumundi station,-26.480470,152.955037
+place_faista,Fairfield station,-27.509731,153.028054
+place_fersta,Ferny Grove station,-27.401865,152.935651
+place_forsta,Fortitude Valley station,-27.456779,153.033243
+place_frusta,Fruitgrove station,-27.598461,153.079996
+place_gaista,Gailes station,-27.602167,152.918895
+place_gaysta,Gaythorne station,-27.419070,152.984639
+place_geesta,Geebung station,-27.368811,153.047070
+place_gmtsta,Glass House Mountains station,-26.899110,152.956837
+place_goosta,Goodna station,-27.608543,152.901126
+place_grasta,Graceville station,-27.520749,152.975727
+place_grosta,Grovely station,-27.404511,152.962508
+place_gymsta,Gympie North station,-26.159390,152.682995
+place_helsta,Helensvale station,-27.925333,153.338816
+place_hemsta,Hemmant station,-27.447541,153.126663
+place_hensta,Hendra station,-27.422240,153.062624
+place_holsta,Holmview station,-27.710075,153.188309
+place_hopsta,Hope Island station,-27.880118,153.331141
+place_indsta,Indooroopilly station,-27.503013,152.976083
+place_intsta,International Airport station,-27.402924,153.108816
+place_ipssta,Ipswich station,-27.613091,152.760317
+place_kalsta,Kallangur station,-27.256716,153.000459
+place_karsta,Karrabin station,-27.604326,152.709258
+place_kepsta,Keperra station,-27.409672,152.956939
+place_kgtsta,Kingston station,-27.656653,153.118444
+place_kprsta,Kippa-Ring station,-27.225228,153.081902
+place_kursta,Kuraby station,-27.605115,153.091430
+place_lansta,Landsborough station,-26.808077,152.966173
+place_lawsta,Lawnton station,-27.281635,152.980779
+place_linsta,Lindum station,-27.442275,153.145112
+place_logsta,Loganlea station,-27.671085,153.138078
+place_lotsta,Lota station,-27.469709,153.188143
+place_mhesta,Mango Hill East station,-27.232661,153.036020
+place_mahsta,Mango Hill station,-27.245928,153.027436
+place_mansta,Manly station,-27.456995,153.180762
+place_milsta,Milton station,-27.468684,153.005173
+place_mitsta,Mitchelton station,-27.411626,152.976087
+place_molsta,Mooloolah station,-26.765454,152.962979
+place_myesta,Morayfield station,-27.110209,152.952745
+place_mgssta,Morningside station,-27.470891,153.069694
+place_mursta,Murarrie station,-27.464875,153.104883
+place_mudsta,Murrumba Downs station,-27.252047,153.011413
+place_namsta,Nambour station,-26.625521,152.958235
+place_narsta,Narangba station,-27.202431,152.959821
+place_nrgsta,Nerang station,-27.994492,153.350222
+place_newsta,Newmarket station,-27.433020,153.010165
+place_npksta,Norman Park station,-27.481707,153.061639
+place_nobsta,North Boondall station,-27.338680,153.060357
+place_norsta,Northgate station,-27.393276,153.068837
+place_nudsta,Nudgee station,-27.366275,153.083684
+place_nunsta,Nundah station,-27.401045,153.061677
+place_omesta,Ormeau station,-27.799240,153.282383
+place_ormsta,Ormiston station,-27.514533,153.256360
+place_oxfsta,Oxford Park station,-27.404415,152.968950
+place_oxlsta,Oxley station,-27.552624,152.973698
+place_palsta,Palmwoods station,-26.688513,152.961031
+place_petsta,Petrie station,-27.268242,152.981623
+place_pimsta,Pimpama station,-27.816032,153.296222
+place_pomsta,Pomona station,-26.365875,152.856807
+place_redsta,Redbank station,-27.599707,152.872361
+place_ricsta,Richlands station,-27.595894,152.947269
+place_rivsta,Riverview station,-27.595247,152.850344
+place_rbnsta,Robina station,-28.070986,153.377926
+place_rocsta,Rocklea station,-27.544914,153.013636
+place_romsta,Roma Street station,-27.465617,153.019385
+place_rossta,Rosewood station,-27.643077,152.592226
+place_rotsta,Rothwell station,-27.223473,153.048460
+place_runsta,Runcorn station,-27.592573,153.068547
+place_slysta,Salisbury station,-27.553262,153.022904
+place_sgtsta,Sandgate station,-27.322125,153.069025
+place_shesta,Sherwood station,-27.531137,152.979767
+place_shnsta,Shorncliffe station,-27.327087,153.080993
+place_sbasta,South Bank station,-27.481157,153.022756
+place_sousta,South Brisbane station,-27.474952,153.018539
+place_spcsta,Springfield Central station,-27.674125,152.902793
+place_sprsta,Springfield station,-27.660030,152.921309
+place_strsta,Strathpine station,-27.311118,152.989659
+place_sunsta,Sunnybank station,-27.580620,153.053996
+place_snssta,Sunshine station,-27.375434,153.055655
+place_tarsta,Taringa station,-27.493308,152.981860
+place_thasta,Thagoona station,-27.626391,152.630755
+place_thmsta,Thomas Street station,-27.614583,152.745513
+place_thosta,Thorneside station,-27.486298,153.193068
+place_tomsta,Toombul station,-27.407447,153.058860
+place_twgsta,Toowong station,-27.485471,152.993267
+place_trvsta,Traveston station,-26.321113,152.784072
+place_trista,Trinder Park station,-27.631828,153.097666
+place_varsta,Varsity Lakes station,-28.096782,153.399621
+place_virsta,Virginia station,-27.382637,153.063110
+place_wacsta,Wacol station,-27.589336,152.924464
+place_walsta,Walloon station,-27.607215,152.667634
+place_welsta,Wellington Point station,-27.494266,153.242372
+place_wilsta,Wilston station,-27.436211,153.019034
+place_winsta,Windsor station,-27.434934,153.029041
+place_wdrsta,Woodridge station,-27.638290,153.103625
+place_wolsta,Wooloowin station,-27.420028,153.043557
+place_wbysta,Woombye station,-26.660658,152.962924
+place_wulsta,Wulkuraka station,-27.613838,152.732787
+place_wynsta,Wynnum Central station,-27.445791,153.170730
+place_wyhsta,Wynnum North station,-27.437388,153.158586
+place_wnmsta,Wynnum station,-27.439830,153.165625
+place_yansta,Yandina station,-26.560648,152.957699
+place_yeesta,Yeerongpilly station,-27.525324,153.014186
+place_yersta,Yeronga station,-27.517815,153.017035
+place_zllsta,Zillmere station,-27.359268,153.037514

@@ -371,7 +371,6 @@ type Change struct {
     Name      string
     Buffer    time.Duration // live: arrival of leg 1 → departure of leg 2
     Tight     bool          // Buffer < 5 min
-    Infeasible bool         // Buffer < 4 min after realtime applied
 }
 
 type Leg struct {
@@ -436,7 +435,7 @@ type Date struct {
   - Resolved by name against the loaded index on boot. A rename (as already happened to Park Road → Boggo Road) logs a loud warning rather than silently disabling interchange routing.
 - **Algorithm:** for each interchange `X` not equal to origin or destination, find the next direct legs `origin → X` and `X → dest`, pair them where `depart(leg2) ≥ arrive(leg1) + 4 min`, and keep the pairing with the earliest arrival per interchange. Seven interchanges × two direct lookups is cheap enough to run on every query.
 - **Minimum connection time: flat 4 minutes**, applied uniformly. We have no `transfers.txt` and will not pretend to model platform geometry.
-- **The buffer is always displayed**, and anything under 5 minutes is flagged `tight`. As realtime erodes it — a late inbound train — the buffer shrinks live and flips to `tight`, then `infeasible` below 4 min, at which point the journey is dropped and recomputed. This puts the judgement with the user instead of us asserting a connection is safe.
+- **The buffer is always displayed**, and anything under 5 minutes is flagged `tight`. Pairing uses *expected* times, so as realtime erodes a connection — a late inbound train — the buffer shrinks live and flips to `tight`; once it falls below 4 minutes that pairing is dropped and the next feasible second leg is chosen instead. There is no `infeasible` state to emit: an infeasible connection is never returned. This puts the judgement with the user instead of us asserting a connection is safe.
 - **Direct always wins on ties.** One-change results only appear when they arrive earlier than a direct option, or when no direct service exists in the window. If neither exists: `no service found` with the next direct departure time, however far out.
 
 ### 3.7 `gtfsrail/internal/stationlex` — "central" → Central station

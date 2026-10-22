@@ -13,3 +13,4 @@ web/dist/*
 /trains.exe
 /trainsd
 /trainsd.exe
+*.tsbuildinfo

@@ -38,42 +38,42 @@ graph LR
 
 Blocks everything. Small, but every later lane depends on its exact shapes.
 
-- [ ] **0.1** `go mod init trains`, `go 1.26`; add `github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs v1.0.0`
+- [x] **0.1** `go mod init trains`, `go 1.26`; add `github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs v1.0.0`
   - Files: `go.mod`, `go.sum`
   - Done when: `go build ./...` succeeds
-- [ ] **0.2** Public domain types exactly as §3.5: `StopID`, `StationID`, `TripID`, `RouteID`, `ServiceID`, `ShapeID` (distinct string types), `Date`, `Position`, `TimeSource`, `Punctuality`, `Journey`, `Leg`, `Call`, `Change`, `VehicleFix`, `Alert`
+- [x] **0.2** Public domain types exactly as §3.5: `StopID`, `StationID`, `TripID`, `RouteID`, `ServiceID`, `ShapeID` (distinct string types), `Date`, `Position`, `TimeSource`, `Punctuality`, `Journey`, `Leg`, `Call`, `Change`, `VehicleFix`, `Alert`
   - Files: `gtfsrail/types.go`
   - Done when: compiles; enums have `String()`
-- [ ] **0.3** JSON wire contract (below) as Go DTOs plus `FromJourney`/`FromLeg` converters, mirrored as TS types. Shared by serve mode and `trains --json`, so it lives in the library, not under either mode's package
+- [x] **0.3** JSON wire contract (below) as Go DTOs plus `FromJourney`/`FromLeg` converters, mirrored as TS types. Shared by serve mode and `trains --json`, so it lives in the library, not under either mode's package
   - Files: `gtfsrail/wire/`, `web/src/api/types.ts`
   - Done when: both compile; field names identical
-- [ ] **0.4** `web/` scaffold: Vite + React + TS, `web/embed.go` with `//go:embed all:dist`, committed `web/dist/.gitkeep`
+- [x] **0.4** `web/` scaffold: Vite + React + TS, `web/embed.go` with `//go:embed all:dist`, committed `web/dist/.gitkeep`
   - Files: `web/`
   - Done when: `go build ./...` passes with an empty `dist`
-- [ ] **0.5** `cmd/capture`: fetch all three realtime feeds at one instant, write raw `.pb`
+- [x] **0.5** `cmd/capture`: fetch all three realtime feeds at one instant, write raw `.pb`
   - Files: `cmd/capture/`
   - Done when: writes `testdata/rt/<ts>/{tu,vp,alerts}.pb`
-- [ ] **0.6** Export the 154 real rail stations (`id,name,lat,lon`) from the current feed, so P3 can test against real names without waiting for P1
+- [x] **0.6** Export the 154 real rail stations (`id,name,lat,lon`) from the current feed, so P3 can test against real names without waiting for P1
   - Files: `testdata/stations.csv`
   - Done when: 154 rows; P1.9 later asserts the parser produces the identical set
 
-The static fixture tool (`cmd/mkfixture`) needs the P1 parser, so it is task 1.9.
+`cmd/mkfixture` is raw-CSV only (no dependency on the P1 parser), so it shipped in P0 to produce `testdata/stations.csv`; 1.9 covers the fixture checks.
 
 ### Wire contract (frozen in P0)
 
-Library types stay idiomatic Go (`time.Time`, `time.Duration`). `gtfsrail/wire` converts them to DTOs at the edge, for both serve mode and `trains --json`. Conventions: camelCase keys, timestamps as RFC3339 with the `+10:00` offset, durations as integer **seconds**, absent values as `null` — never omitted.
+Library types stay idiomatic Go (`time.Time`, `time.Duration`). `gtfsrail/wire` converts them to DTOs at the edge, for both serve mode and `trains --json`. Conventions: camelCase keys, timestamps as RFC3339 with the `+10:00` offset, durations as integer **seconds**, absent values as `null` — never omitted. **The authoritative copies are `gtfsrail/wire/wire.go` and `web/src/api/types.ts`;** the summary below is for orientation.
 
 ```ts
 type Punctuality = 'early' | 'onTime' | 'late' | 'veryLate' | 'skipping' | 'cancelled' | 'scheduled';
 type Position    = 'passed' | 'current' | 'upcoming';
 type TimeSource  = 'observed' | 'predicted' | 'projected' | 'scheduled';
 
-interface Station    { id: string; name: string; lat: number; lon: number }
+interface Station    { id: string; name: string; lat: number; lon: number; aliases: string[] }
 interface Call       { stationId: string; name: string; platform: string | null;
                        scheduled: string; expected: string; actual: string | null;
                        position: Position; source: TimeSource; skipped: boolean }
-interface VehicleFix { lat: number; lon: number; atSequence: number;
-                       status: 'STOPPED_AT' | 'IN_TRANSIT_TO'; observedAt: string; stale: boolean }
+interface VehicleFix { lat: number; lon: number; atSequence: number; atIndex: number | null;
+                       status: 'STOPPED_AT' | 'IN_TRANSIT_TO' | 'INCOMING_AT'; observedAt: string; stale: boolean }
 interface Alert      { id: string; header: string; description: string;
                        effect: string; cause: string; activeUntil: string | null }
 interface Leg        { tripId: string; serviceDate: string /* YYYY-MM-DD */; runNumber: string | null;
@@ -81,18 +81,24 @@ interface Leg        { tripId: string; serviceDate: string /* YYYY-MM-DD */; run
                        calls: Call[]; board: number; alight: number;
                        punctuality: Punctuality; delaySeconds: number;
                        vehicle: VehicleFix | null; alerts: Alert[]; shapeId: string | null }
-interface Change     { stationId: string; name: string; bufferSeconds: number; tight: boolean; infeasible: boolean }
+interface Change     { stationId: string; name: string; bufferSeconds: number; tight: boolean }
 interface Journey    { legs: Leg[]; change: Change | null; depart: string; arrive: string; punctuality: Punctuality }
 
-interface JourneysResponse { journeys: Journey[]; generatedAt: string; dataAgeSeconds: number; degraded: boolean }
+interface JourneysResponse { origin: Station; destination: Station; journeys: Journey[];
+                             generatedAt: string; dataAgeSeconds: number; degraded: boolean }
 interface LegResponse      { leg: Leg; generatedAt: string; dataAgeSeconds: number; degraded: boolean }
 interface ShapeResponse    { shapeId: string; points: [number, number][] /* [lat, lon] */ }
+interface StationsResponse { stations: Station[] }
 interface ErrorResponse    { error: 'ambiguous' | 'unknown_station' | 'not_found' | 'bad_request';
                              message: string; candidates?: Station[] }
 ```
 
 - `ADDED` trips have `shapeId: null` (no static trip to take one from); the UI hides the diagram for them.
 - `/api/journeys` with an ambiguous station returns `400` + `ErrorResponse{error:'ambiguous', candidates}` — the UI's disambiguation list is driven by this, not a second endpoint.
+- `/api/legs/{tripId}?date=&from=&to=` — optional `from`/`to` station IDs set `board`/`alight`; without them the whole trip is returned with `board=0`, `alight=last`.
+- `Station.aliases` carries the curated aliases (§3.7), so the UI's client-side picker matches them without a second copy of the alias table.
+- `Change` has no `infeasible` flag: pairings are made on expected times, so a connection eroded below 4 min is dropped and the next feasible pairing chosen before anything is emitted (§3.6).
+- `VehicleFix.atIndex` saves the UI from searching `calls` for `atSequence`.
 
 ---
 
