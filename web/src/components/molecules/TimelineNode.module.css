@@ -1,0 +1,47 @@
+.node {
+  --dot-y: 22px;
+  position: relative; display: grid; grid-template-columns: 32px 1fr; gap: var(--space-2);
+  min-height: 56px; list-style: none;
+}
+.rail { position: relative; }
+.above, .below { position: absolute; left: 50%; width: 0; margin-left: -1.5px; border-left: 3px solid var(--line); }
+.above { top: 0; height: var(--dot-y); }
+.below { top: var(--dot-y); bottom: 0; border-left-style: dashed; opacity: 0.7; }
+.passed .above, .passed .below, .current .above { border-left-style: solid; opacity: 1; }
+.upcoming .above { border-left-style: dashed; opacity: 0.7; }
+.dot {
+  position: absolute; left: 50%; top: var(--dot-y); width: 14px; height: 14px; transform: translate(-50%, -50%);
+  border-radius: 50%; border: 3px solid var(--line); background: var(--bg);
+}
+.passed .dot { background: var(--line); }
+.endpoint .dot { width: 18px; height: 18px; }
+.skipped .dot { border-style: dotted; border-color: var(--fg-faint); background: var(--bg); }
+
+.marker {
+  position: absolute; left: 50%; top: var(--dot-y); width: 20px; height: 20px; transform: translate(-50%, -50%);
+  border-radius: 50%; background: var(--fg); box-shadow: 0 0 0 3px var(--line); z-index: 2;
+  animation: pulse 1.6s ease-in-out infinite; transition: top 0.8s ease;
+}
+/* In transit: the marker sits fraction f along the rail from the previous node (assumed one row above). */
+.transit { top: calc(var(--dot-y) - (1 - var(--f, 1)) * 56px); }
+.stale { background: var(--fg-faint); animation: none; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--line), 0 0 0 3px rgb(255 255 255 / 0.4); }
+  50% { box-shadow: 0 0 0 3px var(--line), 0 0 0 10px rgb(255 255 255 / 0); }
+}
+@media (prefers-reduced-motion: reduce) { .marker { animation: none; transition: none; } }
+
+.content { display: flex; flex-direction: column; gap: 2px; padding: 10px 0 var(--space-2); min-width: 0; }
+.head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.name { font-weight: 600; }
+.passed .name { color: var(--fg-muted); font-weight: 500; }
+.current .name { font-size: var(--fs-lg); }
+.unknown { font-style: italic; color: var(--fg-muted); }
+.skipped .name { text-decoration: line-through; color: var(--fg-faint); }
+.times { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); }
+.offset { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-sm); color: var(--ok); }
+.warn { color: var(--warn); }
+.bad { color: var(--bad); }
+.early { color: var(--info); }
+.note { font-size: var(--fs-sm); color: var(--fg-faint); }
+.estimated { font-size: var(--fs-sm); color: var(--sched); font-style: italic; border-bottom: 1px dotted var(--sched); }

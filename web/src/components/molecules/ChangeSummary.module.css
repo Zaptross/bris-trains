@@ -1,0 +1,5 @@
+.change { font-size: var(--fs-sm); color: var(--fg-muted); }
+.buffer { font-variant-numeric: tabular-nums; color: var(--fg); font-weight: 600; }
+.tight { color: var(--warn); }
+.tight .buffer { color: var(--warn); }
+.tag { font-weight: 700; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }

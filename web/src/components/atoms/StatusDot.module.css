@@ -1,0 +1,9 @@
+.dot { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.glyph { font-size: 0.9em; line-height: 1; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.default { color: var(--fg); }
+.ok { color: var(--ok); }
+.warn { color: var(--warn); }
+.bad { color: var(--bad); }
+.info { color: var(--info); }
+.muted { color: var(--sched); }

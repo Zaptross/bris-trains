@@ -1,0 +1,23 @@
+.row {
+  display: grid; grid-template-columns: auto auto 1fr; gap: var(--space-3); align-items: start;
+  width: 100%; min-height: var(--touch); padding: var(--space-3); text-align: left;
+  background: var(--surface); border: 1px solid var(--border); border-left: 0; border-radius: var(--radius);
+  cursor: pointer; color: var(--fg);
+}
+.row:disabled { cursor: default; }
+.row:not(:disabled):hover { background: var(--surface-2); }
+.swatches { display: flex; gap: 2px; align-self: stretch; }
+.when { display: flex; flex-direction: column; min-width: 4.2em; }
+.depart { line-height: 1.1; }
+.body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.top { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.route { font-weight: 600; }
+.headsign { color: var(--fg-muted); font-weight: 400; }
+.meta { display: flex; flex-wrap: wrap; gap: var(--space-3); color: var(--fg-muted); font-size: var(--fs-sm); }
+.run { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.schedOnly { color: var(--sched); font-size: var(--fs-sm); }
+.degraded { opacity: 0.6; }
+.cancelled .route { text-decoration: line-through; color: var(--fg-muted); }
+@media (min-width: 600px) {
+  .route { font-size: var(--fs-lg); }
+}

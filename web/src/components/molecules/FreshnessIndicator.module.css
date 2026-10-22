@@ -1,0 +1,6 @@
+.fresh { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); white-space: nowrap; }
+.age { font-variant-numeric: tabular-nums; }
+.pip { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.live { color: var(--ok); }
+.stale { color: var(--warn); }
+.degraded { color: var(--sched); white-space: normal; }

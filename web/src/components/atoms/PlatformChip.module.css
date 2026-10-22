@@ -1,0 +1,6 @@
+.chip {
+  display: inline-block; min-width: 2.6em; text-align: center; padding: 1px 4px;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--fs-sm);
+  border: 1px solid var(--border); border-radius: 4px; background: var(--surface-2); white-space: nowrap;
+}
+.none { color: var(--fg-faint); }

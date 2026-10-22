@@ -1,0 +1,6 @@
+.time { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.sm { font-size: var(--fs-sm); font-weight: 500; }
+.md { font-size: var(--fs-md); }
+.lg { font-size: var(--fs-xl); letter-spacing: -0.02em; }
+.muted { color: var(--fg-muted); }
+.struck { text-decoration: line-through; color: var(--fg-faint); }

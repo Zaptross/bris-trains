@@ -1,0 +1,2 @@
+.countdown { font-variant-numeric: tabular-nums; color: var(--fg-muted); font-size: var(--fs-sm); white-space: nowrap; }
+.now { color: var(--fg); font-weight: 700; }

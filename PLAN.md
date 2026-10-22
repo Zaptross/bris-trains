@@ -242,14 +242,14 @@ The integration point and the highest-risk code. **Golden tests are written befo
 
 Built against typed fixture objects conforming to `web/src/api/types.ts`, so every state (late, skipped, stale, degraded, tight change) is exercisable before the backend exists.
 
-- [ ] **7a.1** Design tokens as CSS custom properties: near-black board background, high-contrast foreground, amber/green/red status palette, `font-variant-numeric: tabular-nums` for every time, a monospace stack for times and platforms. `route_color` is injected per row as `--line` and is the only per-route colour
+- [x] **7a.1** Design tokens as CSS custom properties: near-black board background, high-contrast foreground, amber/green/red status palette, `font-variant-numeric: tabular-nums` for every time, a monospace stack for times and platforms. `route_color` is injected per row as `--line` and is the only per-route colour
 - [ ] **7a.2** Mobile-first layout rules: designed at 360 px wide first; touch targets ≥ 44 px; two panes at ≥ 900 px
-- [ ] **7a.3** Atoms (§6.1): `Text`, `Badge`, `StatusDot`, `Spinner`, `TimeLabel`, `Countdown`, `DelayChip`, `PlatformChip`, `LineSwatch`, `Button`, `Input`
-- [ ] **7a.4** `StationPicker` — combobox, keyboard + touch, same tiers as P3 run client-side over `/api/stations`
-- [ ] **7a.5** `JourneyRow` + `ChangeSummary` (including tight-state styling)
-- [ ] **7a.6** `TimelineNode` — every Position × Source × Skipped combination from §6.3
-- [ ] **7a.7** `FreshnessIndicator` + `AlertBanner`
-- Done when (all of 7a): every fixture state renders correctly at 360 px and at desktop width
+- [x] **7a.3** Atoms (§6.1): `Text`, `Badge`, `StatusDot`, `Spinner`, `TimeLabel`, `Countdown`, `DelayChip`, `PlatformChip`, `LineSwatch`, `Button`, `Input`
+- [x] **7a.4** `StationPicker` — combobox, keyboard + touch, same tiers as P3 run client-side over `/api/stations`
+- [x] **7a.5** `JourneyRow` + `ChangeSummary` (including tight-state styling)
+- [x] **7a.6** `TimelineNode` — every Position × Source × Skipped combination from §6.3
+- [x] **7a.7** `FreshnessIndicator` + `AlertBanner`
+- Done when (all of 7a): every fixture state renders correctly at 360 px and at desktop width — verified in a real browser at `/gallery`: `scrollWidth` 360 at 360 px and 1280 at 1280 px, no console errors. 7a.2's two-pane layout belongs to the pages and is verified in P7b.
 
 ### P7b — screens (after P6; develop against `trains serve` via the Vite proxy)
 

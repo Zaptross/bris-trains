@@ -1,0 +1,13 @@
+.text { margin: 0; }
+.sm { font-size: var(--fs-sm); }
+.md { font-size: var(--fs-md); }
+.lg { font-size: var(--fs-lg); }
+.xl { font-size: var(--fs-xl); line-height: 1.15; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.strong { font-weight: 650; }
+.default { color: var(--fg); }
+.ok { color: var(--ok); }
+.warn { color: var(--warn); }
+.bad { color: var(--bad); }
+.info { color: var(--info); }
+.muted { color: var(--fg-muted); }

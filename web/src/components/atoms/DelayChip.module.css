@@ -1,0 +1,7 @@
+.chip { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-sm); white-space: nowrap; font-weight: 600; }
+.default { color: var(--fg); }
+.ok { color: var(--ok); }
+.warn { color: var(--warn); }
+.bad { color: var(--bad); }
+.info { color: var(--info); }
+.muted { color: var(--sched); }

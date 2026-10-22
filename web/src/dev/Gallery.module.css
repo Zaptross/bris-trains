@@ -1,0 +1,17 @@
+.gallery { max-width: 1200px; margin: 0 auto; padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-5); }
+.header { display: flex; flex-direction: column; gap: 4px; }
+.section { display: flex; flex-direction: column; gap: var(--space-3); border-top: 1px solid var(--border); padding-top: var(--space-4); }
+.body { display: flex; flex-direction: column; gap: var(--space-3); }
+.wrap { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+.col { display: flex; flex-direction: column; gap: var(--space-2); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--space-3); }
+.cell { display: flex; flex-direction: column; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.pickers { display: grid; gap: var(--space-3); }
+.timelines { display: grid; gap: var(--space-5); }
+.timeline { display: flex; flex-direction: column; gap: var(--space-2); }
+.ol { margin: 0; padding: 0; }
+@media (min-width: 900px) {
+  .pickers { grid-template-columns: 1fr 1fr; }
+  .timelines { grid-template-columns: repeat(3, 1fr); }
+}
