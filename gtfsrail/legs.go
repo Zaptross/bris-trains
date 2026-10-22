@@ -203,15 +203,40 @@ func (q *query) build(in legInput) Leg {
 	}
 	cancelled := tu != nil && (tu.Rel == gtfsrt.RelCanceled || tu.Rel == gtfsrt.RelDeleted)
 
-	bySeq := map[uint32]*gtfsrt.StopTimeUpdate{}
-	byStop := map[string]*gtfsrt.StopTimeUpdate{}
+	// The feed can report several stops under one sequence number, and
+	// REPLACEMENT trips can renumber their stops, so a sequence match only
+	// counts when the update is at the same station as the scheduled call.
+	// Updates that match no call by sequence are matched by station instead
+	// (SPEC.md §3.5 rule 3). A stop the timetable doesn't know (Ipswich runs
+	// depart from 600350, absent from every static feed) cannot be shown to
+	// be elsewhere, so it keeps its sequence.
+	stationOf := func(stopID string) (string, bool) {
+		if st, ok := ix.StationOf(stopID); ok {
+			return st.ID, true
+		}
+		return "", false
+	}
+	updateStop := func(u *gtfsrt.StopTimeUpdate) string {
+		if u.AssignedStopID != "" {
+			return u.AssignedStopID
+		}
+		return u.StopID
+	}
+	callStation := make(map[uint32]string, n)
+	for _, r := range in.raws {
+		callStation[uint32(r.seq)], _ = stationOf(r.stopID)
+	}
+	bySeq := map[uint32][]*gtfsrt.StopTimeUpdate{}
+	byStation := map[string]*gtfsrt.StopTimeUpdate{}
 	if tu != nil {
 		for i := range tu.Updates {
 			u := &tu.Updates[i]
-			if u.HasSeq {
-				bySeq[u.Seq] = u
-			} else if u.StopID != "" {
-				byStop[u.StopID] = u
+			station, known := stationOf(updateStop(u))
+			switch {
+			case u.HasSeq && (!known || station == callStation[u.Seq]):
+				bySeq[u.Seq] = append(bySeq[u.Seq], u)
+			case known && byStation[station] == nil:
+				byStation[station] = u
 			}
 		}
 	}
@@ -231,17 +256,33 @@ func (q *query) build(in legInput) Leg {
 
 		// Rules 1–3: observation table first, then the live stop time update
 		// by sequence, then by stop ID.
-		u := bySeq[uint32(r.seq)]
-		if u == nil {
-			u = byStop[r.stopID]
+		var u *gtfsrt.StopTimeUpdate
+		if us := bySeq[uint32(r.seq)]; len(us) > 0 {
+			u = us[0]
+		} else {
+			u = byStation[callStation[uint32(r.seq)]]
 		}
-		stopID := r.stopID
-		if u != nil && u.AssignedStopID != "" {
-			stopID = u.AssignedStopID
+		// Show the platform actually used when realtime names one at this
+		// station; a platform unknown to the timetable is shown as unknown
+		// rather than as the scheduled one.
+		stopID, unknownPlatform := r.stopID, false
+		if u != nil {
+			if s := updateStop(u); s != "" && s != r.stopID {
+				if _, known := stationOf(s); known {
+					stopID = s
+				} else if _, staticKnown := stationOf(r.stopID); staticKnown {
+					unknownPlatform = true
+				} else {
+					stopID = s // neither is known: an ADDED trip at an unknown stop
+				}
+			}
 		}
 		describeStop(ix, c, stopID)
+		if unknownPlatform {
+			c.Platform = ""
+		}
 
-		arr, dep, skipped, ok := realtimeTimes(obs, r, u)
+		arr, dep, skipped, ok := realtimeTimes(obs, r, u, stationOf)
 		switch {
 		case cancelled:
 			c.Skipped = true
@@ -338,8 +379,16 @@ func (q *query) build(in legInput) Leg {
 
 // realtimeTimes returns the realtime arrival and departure for a call from the
 // observation table (preferred) or the live stop time update.
-func realtimeTimes(obs map[uint16]gtfsrt.Obs, r rawCall, u *gtfsrt.StopTimeUpdate) (arr, dep time.Time, skipped, ok bool) {
-	if o, has := obs[r.seq]; has {
+func realtimeTimes(obs map[uint16]gtfsrt.Obs, r rawCall, u *gtfsrt.StopTimeUpdate, stationOf func(string) (string, bool)) (arr, dep time.Time, skipped, ok bool) {
+	o, has := obs[r.seq]
+	if has && o.StopID != "" {
+		observed, knownObs := stationOf(o.StopID)
+		scheduled, _ := stationOf(r.stopID)
+		if knownObs && observed != scheduled {
+			has = false // observed at a different station under this sequence
+		}
+	}
+	if has {
 		if o.Skipped {
 			return time.Time{}, time.Time{}, true, false
 		}

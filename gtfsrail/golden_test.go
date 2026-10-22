@@ -542,6 +542,100 @@ func TestG11DirectWinsTies(t *testing.T) {
 	}
 }
 
+const d510 = "39765169-QR 26_27-44635-D510" // Nambour 05:08 → Ipswich 07:56, 44 stops
+
+var fri = Date{Year: 2026, Month: time.October, Day: 23}
+
+// event adds one stop time update at an explicit stop, time and delay.
+func (b *tuBuilder) event(seq uint32, stop string, at time.Time, delay int32) *tuBuilder {
+	b.tu.StopTimeUpdate = append(b.tu.StopTimeUpdate, &rtpb.TripUpdate_StopTimeUpdate{
+		StopSequence: proto.Uint32(seq), StopId: proto.String(stop),
+		Arrival:   &rtpb.TripUpdate_StopTimeEvent{Delay: proto.Int32(delay), Time: proto.Int64(at.Unix())},
+		Departure: &rtpb.TripUpdate_StopTimeEvent{Delay: proto.Int32(delay), Time: proto.Int64(at.Unix())},
+	})
+	return b
+}
+
+// TestRenumberedReplacement reproduces the live D510 snapshot at 06:42:30 on
+// 2026-10-23. Translink re-sent the trip as a REPLACEMENT numbered from its
+// current position: sequence 1 was Central (static seq 21), 2 Roma Street,
+// and so on. Matched by sequence, Central's update landed on Nambour: the
+// first call was renamed "Central station", kept Nambour's 05:08 schedule,
+// and the train read 94 min late. Sequences must only match at the same
+// station, with renumbered updates applied by station instead.
+func TestRenumberedReplacement(t *testing.T) {
+	ix := fixture(t)
+	now := brisbane(fri, 6, 43, 12)
+	tu := newTU(t, ix, d510, "NAIP-5252", rtpb.TripDescriptor_REPLACEMENT, fri)
+	for i, static := range []uint16{21, 22, 23} { // Central, Roma Street, Milton
+		stop, _, dep := sched(t, ix, d510, static, fri)
+		tu.event(uint32(i+1), stop, dep.Add(2*time.Minute), 120)
+	}
+	s := newService(ix, realtimeAt(t, now, []*tuBuilder{tu}), func() time.Time { return now })
+	l := leg(t, s, d510, fri)
+
+	ref := ix.Trips[d510]
+	for i, st := range ix.TripStopTimes(ref) {
+		station, _ := ix.StationOf(st.StopID)
+		if c := l.Calls[i]; string(c.Station) != station.ID {
+			t.Errorf("seq %d is %s in the timetable but rendered as %s", st.Seq, station.Name, c.Name)
+		}
+	}
+	if c := callAt(t, l, 1); c.Source == Predicted || c.Source == Observed {
+		t.Errorf("Nambour (seq 1) took Central's update: source %v delay %v", c.Source, c.Delay())
+	}
+	for _, seq := range []uint16{21, 22, 23} {
+		if c := callAt(t, l, seq); c.Source != Predicted || c.Delay() != 2*time.Minute {
+			t.Errorf("%s (seq %d): source %v delay %v; want its renumbered update, +2m", c.Name, seq, c.Source, c.Delay())
+		}
+	}
+}
+
+// TestUnknownPlatformKeepsSequence reproduces live run D009 on 2026-10-23: it
+// departed Ipswich (static seq 1, platform 3, stop 600349) from stop 600350,
+// which is in no static feed, at 06:29:32 (+32 s). The unknown stop cannot be
+// shown to be at another station, so the observation stands: the call stays
+// Ipswich, with its platform shown as unknown rather than as platform 3.
+func TestUnknownPlatformKeepsSequence(t *testing.T) {
+	ix := fixture(t)
+	const d009 = "39765121-QR 26_27-44635-D009"
+	now := brisbane(fri, 6, 35, 0)
+	_, _, dep := sched(t, ix, d009, 1, fri)
+	tu := newTU(t, ix, d009, "IPBR-5252", rtpb.TripDescriptor_REPLACEMENT, fri).
+		event(1, "600350", dep.Add(32*time.Second), 32).delayed(32, 2)
+	s := newService(ix, realtimeAt(t, now, []*tuBuilder{tu}), func() time.Time { return now })
+	c := callAt(t, leg(t, s, d009, fri), 1)
+	if c.Name != "Ipswich station" || c.Platform != "" {
+		t.Errorf("seq 1 rendered as %q platform %q; want Ipswich station, platform unknown", c.Name, c.Platform)
+	}
+	if c.Source != Observed || c.Delay() != 32*time.Second {
+		t.Errorf("seq 1: source %v delay %v; want the departure observed at +32s", c.Source, c.Delay())
+	}
+}
+
+// TestUpdateAtWrongStationIgnored reproduces live REPLACEMENT data for D510
+// that reported Booval (stop 42) under sequence 22, which is Roma Street. A
+// sequence match at a different station must not paste Booval's time onto
+// Roma Street; the update still applies to Booval by station.
+func TestUpdateAtWrongStationIgnored(t *testing.T) {
+	ix := fixture(t)
+	now := brisbane(fri, 6, 50, 0)
+	booval, _, boovalDep := sched(t, ix, d510, 42, fri)
+	tu := newTU(t, ix, d510, "NAIP-5252", rtpb.TripDescriptor_REPLACEMENT, fri).
+		delayed(5, 19, 20, 21).
+		event(22, booval, boovalDep.Add(10*time.Minute), 600)
+	s := newService(ix, realtimeAt(t, now, []*tuBuilder{tu}), func() time.Time { return now })
+	l := leg(t, s, d510, fri)
+
+	roma := callAt(t, l, 22)
+	if roma.Name != "Roma Street station" || roma.Delay() != 5*time.Second || roma.Source != Projected {
+		t.Errorf("Roma Street (seq 22): %s delay %v source %v; want +5s carried from Central, not Booval's +10m", roma.Name, roma.Delay(), roma.Source)
+	}
+	if b := callAt(t, l, 42); b.Source != Predicted || b.Delay() != 10*time.Minute {
+		t.Errorf("Booval (seq 42): source %v delay %v; want the misnumbered update matched by station (+10m)", b.Source, b.Delay())
+	}
+}
+
 // TestPostMidnightStartDateStamp reproduces a live observation: Translink
 // stamps run 1RC6, scheduled at 24:02 on Thursday's service, with start_date
 // 20261023 and start_time 00:02:00. Its realtime must still attach to

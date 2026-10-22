@@ -90,6 +90,7 @@
 - `stop_time_update.schedule_relationship`: `SCHEDULED` 3070, **`SKIPPED` 80**.
 - `stop_time_properties.assigned_stop_id` present on 475 STUs; **differed from `stop_id` in 0 cases**. Honour it anyway (authoritative platform assignment) but do not depend on it.
 - `trip.start_date` present 120/120. **`trip.direction_id` present 0/120** → direction MUST come from static `trips.txt`.
+- **A trip starting after midnight is stamped with the calendar date.** Run 1RC6, scheduled at 24:02 on the 22nd's service, arrives as `start_date` 20261023 `start_time` 00:02:00 (seen live on 2026-10-23). Matching runs by `start_date` alone silently drops its realtime. Runs are matched by start instant instead (nearest within 12 h; runs of one trip are 24 h apart).
 - `TripUpdate.delay` (trip-level) present 0/120 → per-stop delays only.
 
 **ID reconciliation**
@@ -310,9 +311,9 @@ type Obs struct {
 
 **Resolution order for a stop's realtime time:**
 
-1. Observation table entry for `(trip, seq)` — the strongest evidence, since it survives feed trimming.
-2. STU matched by `stop_sequence` (present 3150/3150).
-3. STU matched by `stop_id`, then `stop_time_properties.assigned_stop_id`.
+1. Observation table entry for `(trip, seq)` — the strongest evidence, since it survives feed trimming. It records the stop it was reported at and is ignored if that stop is at a different station.
+2. STU matched by `stop_sequence` (present 3150/3150) — **only when the STU's stop (`assigned_stop_id`, else `stop_id`) is at the same station as the timetable's stop at that sequence**, or is unknown to the timetable. Live testing (2026-10-23) found `REPLACEMENT` trips re-sent with renumbered stops (D510's seq 1 was Central, which is static seq 21) and two stops under one sequence. In one snapshot, 21 updates were at a different station from their sequence. A stop the timetable lacks (600350, an Ipswich platform) can't be shown to be elsewhere, so it keeps its sequence and the call's platform is shown as unknown.
+3. STU matched by station, for updates that matched no sequence.
 4. No coverage, *before* the first STU → static schedule, source `Scheduled`.
 5. No coverage, *after* the last STU → static schedule **+ last observed delay**, source `Projected`.
 6. `SKIPPED` → `Skipped=true`; its times are unusable and it does **not** reset the propagated delay.

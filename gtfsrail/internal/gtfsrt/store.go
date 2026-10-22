@@ -64,6 +64,10 @@ type Obs struct {
 	ArrTime, DepTime   int64 // unix seconds, 0 = unobserved
 	ArrDelay, DepDelay int32
 	Skipped            bool
+	// StopID is the stop the event was reported at (assigned_stop_id when
+	// given). The feed can report two different stops under one sequence
+	// number, so consumers check it against the stop they expect.
+	StopID string
 }
 
 // FeedHealth reports fetch status for one feed.
@@ -371,7 +375,19 @@ func (s *Store) recordObservations(trips map[string]*TripUpdate, now time.Time) 
 				}
 			}
 			key := uint16(u.Seq)
+			stop := u.StopID
+			if u.AssignedStopID != "" {
+				stop = u.AssignedStopID
+			}
 			o := m[key]
+			if stop != "" && o.StopID != "" && stop != o.StopID {
+				// A different stop under the same sequence: replace rather
+				// than mix the two stops' fields.
+				o = Obs{}
+			}
+			if stop != "" {
+				o.StopID = stop
+			}
 			if u.Arrival.HasTime {
 				o.ArrTime = u.Arrival.Time
 			}
