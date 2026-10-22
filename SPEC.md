@@ -579,6 +579,7 @@ One-change journeys only appear when no direct option arrives sooner (§3.6), so
 ### 6.3 Screen 2 — Trip timeline
 
 - Vertical timeline, one `TimelineNode` per call (observed max 44 stops; 39 in the sample trip).
+- **Stops outside your ride are folded by default.** Calls before boarding and after alighting collapse into a "12 stops…" text button (`StopsRollup`) that expands in place, with the rail drawn through it. When the train's current position is inside a folded section — typically while it approaches your boarding stop — the button reads "12 stops… · train here", so folding never hides where your train is. Folding resets when switching legs.
 - Each node: station name, platform, scheduled time, expected time when it differs, and a signed offset (`+34s`, `−2 min`).
 - Node rendering maps from `Call.Position` × `Call.Source` (§3.5):
   - **Passed** — filled dot, solid rail above; shows the actual time when `Source=Observed`, otherwise the scheduled time marked "not observed".

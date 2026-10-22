@@ -1,0 +1,33 @@
+/* Same two-column grid as TimelineNode so the rail lines up. */
+.row {
+  position: relative; display: grid; grid-template-columns: 32px 1fr; gap: var(--space-2);
+  list-style: none; min-height: var(--touch);
+}
+/* The rail runs through the whole row: the folded stops are still part of the line. */
+.rail { position: relative; }
+.rail::before {
+  content: ""; position: absolute; left: 50%; margin-left: -1.5px; top: 0; bottom: 0;
+  border-left: 3px dashed var(--line); opacity: 0.7;
+}
+.passed .rail::before { border-left-style: solid; opacity: 1; }
+/* Before-boarding stops: the trip's first stop is folded, so the line starts mid-row. */
+.before .rail::before { top: 50%; }
+/* After-alighting stops: the trip's last stop is folded, so the line ends mid-row. */
+.after .rail::before { bottom: 50%; }
+
+.toggle {
+  justify-self: start; display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: var(--touch); padding: 0 var(--space-2); margin-left: calc(-1 * var(--space-2));
+  background: none; border: 0; border-radius: var(--radius);
+  color: var(--fg-muted); font-size: var(--fs-sm); cursor: pointer;
+}
+.label { text-decoration: underline dotted; text-underline-offset: 3px; }
+.toggle:hover { color: var(--fg); }
+
+.train { display: inline-flex; align-items: center; gap: 6px; color: var(--fg); }
+.pip {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--line);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--line) 35%, transparent);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--line) 10%, transparent); } }
