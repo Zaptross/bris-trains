@@ -137,20 +137,8 @@ type HealthResponse struct {
 	Degraded         bool       `json:"degraded"`
 }
 
-// Brisbane is the zone every timestamp is rendered in.
-var Brisbane = mustLoad("Australia/Brisbane")
-
-func mustLoad(name string) *time.Location {
-	loc, err := time.LoadLocation(name)
-	if err != nil {
-		// Queensland has no DST, so a fixed zone is exact when tzdata is absent.
-		return time.FixedZone("AEST", 10*60*60)
-	}
-	return loc
-}
-
-// Time formats t as RFC3339 in Brisbane.
-func Time(t time.Time) string { return t.In(Brisbane).Format(time.RFC3339) }
+// Time formats t as RFC3339 in Australia/Brisbane.
+func Time(t time.Time) string { return t.In(gtfsrail.Brisbane).Format(time.RFC3339) }
 
 func timePtr(t *time.Time) *string {
 	if t == nil {

@@ -104,32 +104,33 @@ interface ErrorResponse    { error: 'ambiguous' | 'unknown_station' | 'not_found
 
 ## P1 — Static rail index (`gtfsrail/internal/gtfs`, `gtfsrail/internal/geo`)
 
-- [ ] **1.1** `Secs` parser for `H+:MM:SS`, accepting hours ≥ 24 (§2.2: max `26:16:00`)
+- [x] **1.1** `Secs` parser for `H+:MM:SS`, accepting hours ≥ 24 (§2.2: max `26:16:00`)
   - Done when: rejects malformed input; `26:16:00` → 94,560
-- [ ] **1.2** Streaming CSV reader: header-indexed columns (never positional), CRLF (verified present), **whitespace-trimmed fields** — `stop_lat` is `' -27.470552'` with a leading space in the real feed
+- [x] **1.2** Streaming CSV reader: header-indexed columns (never positional), CRLF (verified present), **whitespace-trimmed fields** — `stop_lat` is `' -27.470552'` with a leading space in the real feed
   - Done when: parses real `stops.txt` without float errors
-- [ ] **1.3** Filtered pass in dependency order (§3.3); one flat `[]StopTime` backing array with per-trip ranges
+- [x] **1.3** Filtered pass in dependency order (§3.3); one flat `[]StopTime` backing array with per-trip ranges
   - Done when: counts match §2.1
-- [ ] **1.4** Station/platform grouping via `parent_station`; `StationOf`, `TripsCalling` inverted index
+- [x] **1.4** Station/platform grouping via `parent_station`; `StationOf`, `TripsCalling` inverted index
   - Done when: 154 stations, 359 platforms, 0 orphans
-- [ ] **1.5** `ActiveServices(Date)`: `calendar.txt` weekday + range, then `calendar_dates.txt` add/remove overrides
+- [x] **1.5** `ActiveServices(Date)`: `calendar.txt` weekday + range, then `calendar_dates.txt` add/remove overrides
   - Done when: unit-tested against real rail service rows, including a removal exception
-- [ ] **1.6** `geo.Simplify` — Douglas–Peucker to ≤120 points
+- [x] **1.6** `geo.Simplify` — Douglas–Peucker to ≤120 points
   - Done when: 667 shapes simplify; no shape exceeds 120 points; endpoints preserved
-- [ ] **1.7** gob cache: write after parse, keyed by ETag; load path skips CSV entirely. Shared by both modes (§4.3): write to a temp file in the cache dir, then rename into place; on Windows, retry the rename briefly while another reader holds the file open, then keep the previous cache and log it
+- [x] **1.7** gob cache: write after parse, keyed by ETag; load path skips CSV entirely. Shared by both modes (§4.3): write to a temp file in the cache dir, then rename into place; on Windows, retry the rename briefly while another reader holds the file open, then keep the previous cache and log it
   - Done when: warm load measured and recorded (spec §3.3 target: query under 1 s end to end); a test that races readers against a writer in a loop never decodes a partial index
+  - Measured on the full feed: cold parse 1.08 s; gob 7.74 MB (above the §3.3 "low single-digit MB" estimate — `Calling` is rebuilt on decode rather than stored, which halved it from 14.6 MB); **gob decode 32 ms**. Race test: 40 writes vs 191 concurrent decodes, zero partial reads.
 - [ ] **1.8** Fetcher: conditional `GET` with `If-None-Match`, atomic swap via `atomic.Pointer[Index]`, last-check timestamp beside the gob
   - Done when: a second run issues a `304` and reuses the cache
-- [ ] **1.9** `cmd/mkfixture`: `-stats` prints full-feed counts; default mode cuts the fixture below
-  - Done when: `-stats` reproduces §2.1 (584 / 9,919 / 248,021 / 154 / 359 / 667); station set equals `testdata/stations.csv`; `testdata/static.zip` committed
+- [x] **1.9** Full-feed check: `go test -tags live -run Live ./gtfsrail/internal/gtfs/` parses `scratch/SEQ_GTFS.zip`; `cmd/mkfixture` (P0) cuts the fixture
+  - Done when: the live test reproduces §2.1 (584 / 9,919 / 248,021 / 154 / 359 / 667); station set equals `testdata/stations.csv`; `testdata/static.zip` committed
 
 **Fixture contents (1.9)** — real trips with real IDs, chosen so every P4 golden case has the static data it needs:
 
-- [ ] the Central→Roma Street services from the §2.6 feasibility run
-- [ ] a trip with a post-midnight tail (≥ `24:00:00`)
-- [ ] a Ferny Grove trip and a Cleveland trip, crossing at a shared CBD interchange
-- [ ] trips through Eagle Junction, Northgate and Boggo Road
-- [ ] the stations, platforms, calendar rows and simplified shapes they reference
+- [x] the Central→Roma Street services from the §2.6 feasibility run (all of Thursday's service `44634`, plus Friday's `44635`: 1,508 trips)
+- [x] a trip with a post-midnight tail (≥ `24:00:00`) — 84 such trips, e.g. run 1031 Cleveland 23:39 → Bowen Hills 24:48
+- [x] a Ferny Grove trip and a Cleveland trip, crossing at a shared CBD interchange (232 and 220 calls)
+- [x] trips through Eagle Junction, Northgate and Boggo Road (1,031 / 723 / 648 calls)
+- [x] the stations, platforms, calendar rows and simplified shapes they reference (188 shapes, thinned 4:1)
 
 ---
 
@@ -137,13 +138,13 @@ interface ErrorResponse    { error: 'ambiguous' | 'unknown_station' | 'not_found
 
 - [ ] **2.1** Feed fetcher: conditional `GET`, `304` keeps the prior snapshot, per-feed last-success time
   - Done when: `304` path exercised against the live feed
-- [ ] **2.2** Decode to immutable snapshots: TU by `trip_id`; VP by `trip_id`; alerts indexed by `route_id`, `trip_id`, `stop_id` (§2.3 — never `route_type`)
+- [x] **2.2** Decode to immutable snapshots: TU by `trip_id`; VP by `trip_id`; alerts indexed by `route_id`, `trip_id`, `stop_id` (§2.3 — never `route_type`)
   - Done when: decodes the `cmd/capture` `.pb` files
-- [ ] **2.3** Staleness (§3.4): VP > 120 s → `stale`; TU entirely > 60 min past → dropped; feed > 90 s since success → `degraded`
+- [x] **2.3** Staleness (§3.4): VP > 120 s → `stale`; TU entirely > 60 min past → dropped; feed > 90 s since success → `degraded`
   - Done when: each threshold unit-tested at its boundary
-- [ ] **2.4** Active-window alert filter: any `active_period` containing now; `ActiveUntil` = end of that window
+- [x] **2.4** Active-window alert filter: any `active_period` containing now; `ActiveUntil` = end of that window
   - Done when: the 9-window alert from §2.3 resolves correctly
-- [ ] **2.5** Observation table `map[ObsKey]Obs`, upsert per STU per poll, reset at 03:00 Brisbane
+- [x] **2.5** Observation table `map[ObsKey]Obs`, upsert per STU per poll, reset at 03:00 Brisbane
   - Done when: rollover unit-tested at 02:59:59 and 03:00:00
 - [ ] **2.6** **Two run modes:** `Poll(ctx)` (serve mode: 15 s / 15 s / 60 s goroutines) and `FetchOnce(ctx, 5s)` (query mode: all three concurrently, §4.2)
   - Done when: both covered by the P8 smoke runs
@@ -156,12 +157,12 @@ interface ErrorResponse    { error: 'ambiguous' | 'unknown_station' | 'not_found
 
 Needs only a list of `(StationID, name)` pairs, so it is built and tested against `testdata/stations.csv` (P0.6) — all 154 real names, so real collisions surface. It does not wait for P1.
 
-- [ ] **3.1** Normaliser: lowercase, strip trailing ` station`, fold punctuation and whitespace, strip diacritics
-- [ ] **3.2** Tiered resolve: exact → prefix → word-boundary substring → Levenshtein ≤ 2 against full name and first-*N*-words (§3.7); first non-empty tier wins; >1 hit → `ErrAmbiguous{Candidates}`
-- [ ] **3.3** Alias table (§3.7), including `park road` → Boggo Road
-- [ ] **3.4** `Validate(names, reserved)`: every alias target and every interchange name (§3.6) must resolve to exactly one station, and no station or alias may normalise to a reserved word (the binary passes its subcommand names, §4.1). Violations are returned for a loud startup warning
+- [x] **3.1** Normaliser: lowercase, strip trailing ` station`, fold punctuation and whitespace, strip diacritics
+- [x] **3.2** Tiered resolve: exact → prefix → word-boundary substring → Levenshtein ≤ 2 against full name and first-*N*-words (§3.7); first non-empty tier wins; >1 hit → `ErrAmbiguous{Candidates}`
+- [x] **3.3** Alias table (§3.7), including `park road` → Boggo Road
+- [x] **3.4** `Validate(names, reserved)`: every alias target and every interchange name (§3.6) must resolve to exactly one station, and no station or alias may normalise to a reserved word (the binary passes its subcommand names, §4.1). Violations are returned for a loud startup warning
   - Done when: warns, does not crash, if a station is renamed
-- [ ] **3.5** Table test over every §3.7 case
+- [x] **3.5** Table test over every §3.7 case
   - Done when: `central`→Central (not Wynnum/Springfield Central), `roma`→Roma Street, `south`→ambiguous ×2, `airport`→ambiguous ×2, `wynnum`→Wynnum, `springfield`→Springfield, `mango hill`→Mango Hill, `romma`→Roma Street, `indro`→Indooroopilly, `park road`→Boggo Road
 
 ---
@@ -170,29 +171,29 @@ Needs only a list of `(StationID, name)` pairs, so it is built and tested agains
 
 The integration point and the highest-risk code. **Golden tests are written before or alongside each rule, not after**, because the failure modes (§2.3) are silent: wrong data that looks plausible.
 
-- [ ] **4.1** Per-leg call resolution, rules 1–6; `Position` and `Source` per call (§3.5)
-- [ ] **4.2** Forward delay propagation past the last STU; `SKIPPED` does not reset the carried delay (§3.5 rules 5–6)
-- [ ] **4.3** Platform from `assigned_stop_id` → `platform_code`, falling back to the scheduled stop (§2.3)
-- [ ] **4.4** Punctuality bands, with `Scheduled` for trips with no realtime entity (§3.5 table)
-- [ ] **4.5** `ADDED` synthesis from STUs alone; unknown stop IDs → `Unknown stop <id>` (§3.5)
-- [ ] **4.6** Direct journeys across {yesterday, today, tomorrow}; sort by expected departure; `limit` (§3.5)
-- [ ] **4.7** One-change routing over the 7 validated interchanges; 4-min minimum; `tight` < 5 min; `infeasible` < 4 min after realtime → drop and recompute; direct wins on ties (§3.6)
+- [x] **4.1** Per-leg call resolution, rules 1–6; `Position` and `Source` per call (§3.5)
+- [x] **4.2** Forward delay propagation past the last STU; `SKIPPED` does not reset the carried delay (§3.5 rules 5–6)
+- [x] **4.3** Platform from `assigned_stop_id` → `platform_code`, falling back to the scheduled stop (§2.3)
+- [x] **4.4** Punctuality bands, with `Scheduled` for trips with no realtime entity (§3.5 table)
+- [x] **4.5** `ADDED` synthesis from STUs alone; unknown stop IDs → `Unknown stop <id>` (§3.5)
+- [x] **4.6** Direct journeys across {yesterday, today, tomorrow}; sort by expected departure; `limit` (§3.5)
+- [x] **4.7** One-change routing over the 7 validated interchanges; 4-min minimum; `tight` < 5 min; a pairing eroded below 4 min by realtime is dropped and the next feasible second leg chosen; direct wins on ties (§3.6)
 - [ ] **4.8** `Service` facade: `Open(Config)` loads the cache or zip, wires the realtime mode, and runs stationlex validation (§3.2)
 
-**Golden cases (§7)** — each a named test using `testdata/static.zip` plus a code-built `FeedMessage`. Each 4.x task above is done when the golden cases covering it pass.
+**Golden cases (§7)** — each a named test in `gtfsrail/golden_test.go` using `testdata/static.zip` plus a code-built `FeedMessage` decoded by the production decoder. Each 4.x task above is done when the golden cases covering it pass. Mutation check: making `SKIPPED` reset the carried delay fails G5, and dropping the 4-min minimum fails G10.
 
-- [ ] **G1** Trimmed `SCHEDULED` (first STU at seq 29) → earlier calls `Scheduled`; later calls `Projected` with the carried delay
-- [ ] **G2** Same trip, observation table pre-seeded from an earlier full update → past calls `Observed`, not `Scheduled`
-- [ ] **G3** `REPLACEMENT` with a full stop list → `Observed` past, `Predicted` future
-- [ ] **G4** `ADDED` trip → synthesised leg, `shapeId` nil
-- [ ] **G5** `SKIPPED` mid-trip → `Skipped=true`; next projected call keeps the pre-skip delay
-- [ ] **G6** Unknown stop `600192` → rendered, not dropped, no panic
-- [ ] **G7** Vehicle fix 6.1 h old → `stale`; `Position` falls back to time-based rules
-- [ ] **G8** Post-midnight trip from the fixture → attributed to the correct service day, and survives the 03:00 reset
-- [ ] **G9** No realtime entity → `Scheduled`, never `OnTime`
-- [ ] **G10** Two-leg journey; inbound leg delayed to a 3-min buffer → `infeasible`, journey dropped, next pairing chosen
-- [ ] **G11** Direct option arriving at the same time as a one-change option → only the direct journey returned
-- [ ] **G-real** Real-world regression: decode the `cmd/capture` `.pb` snapshot against the full-feed index and assert the reconciliation ratios stay in family with §2.3 (≥ 85% of trip IDs resolve; every `REPLACEMENT` resolves). Catches upstream format drift without pinning exact counts.
+- [x] **G1** Trimmed `SCHEDULED` (first STU at seq 29) → earlier calls `Scheduled`; later calls `Projected` with the carried delay
+- [x] **G2** Same trip, observation table pre-seeded from an earlier full update → past calls `Observed`, not `Scheduled`
+- [x] **G3** `REPLACEMENT` with a full stop list → `Observed` past, `Predicted` future (also: `assigned_stop_id` moves the platform; 60 s is `late`)
+- [x] **G4** `ADDED` trip → synthesised leg, `shapeId` nil
+- [x] **G5** `SKIPPED` mid-trip → `Skipped=true`; next projected call keeps the pre-skip delay
+- [x] **G6** Unknown stop `600192` → rendered, not dropped, no panic
+- [x] **G7** Vehicle fix 6.1 h old → `stale`; `Position` falls back to time-based rules
+- [x] **G8** Post-midnight trip from the fixture → attributed to the correct service day (the 03:00 observation reset itself is P2.5's boundary test)
+- [x] **G9** No realtime entity → `Scheduled`, never `OnTime`
+- [x] **G10** Two-leg journey; inbound leg delayed to a 3-min buffer → pairing dropped, next pairing chosen
+- [x] **G11** Direct option arriving at the same time as a one-change option → only the direct journey returned
+- [x] **G-real** Real-world regression: decode the `cmd/capture` `.pb` snapshot against the fixture index (which covers the capture's service days) and assert reconciliation stays in family with §2.3 (≥ 85% of trip IDs resolve; every `REPLACEMENT` resolves). Capture `20261023T000334`: 24/24 resolve, 470 calls carry realtime.
 
 ---
 

@@ -11,6 +11,16 @@ import (
 	"time"
 )
 
+// Brisbane is Australia/Brisbane. Queensland observes no DST, so the fixed
+// +10:00 fallback is exact when the host has no tz database.
+var Brisbane = func() *time.Location {
+	loc, err := time.LoadLocation("Australia/Brisbane")
+	if err != nil {
+		return time.FixedZone("AEST", 10*60*60)
+	}
+	return loc
+}()
+
 // Identifier types. They are distinct so a platform can never be passed where
 // a station is expected.
 type (
@@ -218,6 +228,10 @@ type Call struct {
 	Position  Position
 	Source    TimeSource
 	Skipped   bool // the train will not stop here
+
+	// Arrival times, which differ from departure where the train dwells.
+	// Leg.Arrive uses them for the alighting call.
+	scheduledArrival, expectedArrival time.Time
 }
 
 // Delay is Expected minus Scheduled.
@@ -265,7 +279,13 @@ type Leg struct {
 func (l *Leg) Depart() time.Time { return l.Calls[l.Board].Expected }
 
 // Arrive is the expected arrival at the alighting call.
-func (l *Leg) Arrive() time.Time { return l.Calls[l.Alight].Expected }
+func (l *Leg) Arrive() time.Time {
+	c := &l.Calls[l.Alight]
+	if c.expectedArrival.IsZero() {
+		return c.Expected
+	}
+	return c.expectedArrival
+}
 
 // Change describes the interchange of a one-change journey.
 type Change struct {
