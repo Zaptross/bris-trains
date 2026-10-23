@@ -534,11 +534,14 @@ One-change journeys only appear when no direct option arrives sooner (§3.6), so
       --addr string     listen address (default localhost:8080)
       --dev             enable CORS for the Vite dev server origin
       --cache string    index cache dir (default os.UserCacheDir()/trains)
+      --static-url URL  static GTFS zip (default Translink's SEQ_GTFS.zip)
+      --feeds-url URL   GTFS-RT base; feeds at <URL>/TripUpdates/Rail, /VehiclePositions/Rail, /Alerts
 ```
 
 - Defaults to `localhost` so nothing is exposed by accident. To use the mobile-first UI from a phone on the same network, bind explicitly: `trains serve --addr :8080`.
 - `net/http`, JSON, Vite build served from `embed.FS` at `/`. Same `gtfsrail.Service` as query mode — no logic duplicated, no CORS in production.
 - Exit codes: `0` on clean shutdown (Ctrl-C / SIGTERM); `1` if the address cannot be bound or startup fails.
+- The feed flags point serve mode at mirrors or at `cmd/feedserver`'s copy of the committed fixtures, which CI uses for offline smoke tests. Since the fixture's timetable is dated, CI also pins the server clock with the deliberately undocumented `TRAINS_NOW` (RFC3339) environment variable; the clock then advances in real time from that instant.
 
 | Method | Path | Returns |
 |---|---|---|
@@ -546,7 +549,7 @@ One-change journeys only appear when no direct option arrives sooner (§3.6), so
 | `GET` | `/api/journeys?origin=&destination=&limit=5&at=&direct=` | `{journeys: Journey[], generatedAt, dataAge, degraded}` |
 | `GET` | `/api/legs/{tripId}?date=YYYY-MM-DD` | `{leg: Leg}` — every call with scheduled/expected/actual plus the live vehicle fix |
 | `GET` | `/api/shapes/{shapeId}` | simplified polyline for the line diagram; immutable, `max-age=86400` |
-| `GET` | `/api/healthz` | per-feed last-success timestamp and age |
+| `GET` | `/api/healthz` | per-feed last-success timestamp and age, plus the binary's `version` |
 
 - Every payload carries `generatedAt` and `dataAge` so the UI renders truthful freshness rather than implying live data.
 - `Cache-Control: no-store` on journeys/legs; `max-age=3600` on stations; `max-age=86400` on shapes.

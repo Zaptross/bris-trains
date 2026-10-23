@@ -17,11 +17,22 @@ import (
 // Feeds holds the URLs of the three realtime feeds.
 type Feeds struct{ TripUpdates, VehiclePositions, Alerts string }
 
+// DefaultBase is Translink SEQ's GTFS-RT root.
+const DefaultBase = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ"
+
 // DefaultFeeds are the public Translink SEQ rail feeds.
-var DefaultFeeds = Feeds{
-	TripUpdates:      "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/TripUpdates/Rail",
-	VehiclePositions: "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/VehiclePositions/Rail",
-	Alerts:           "https://gtfsrt.api.translink.com.au/api/realtime/SEQ/Alerts",
+var DefaultFeeds = FeedsAt(DefaultBase)
+
+// FeedsAt returns the rail feeds under a GTFS-RT base URL laid out like
+// Translink's: <base>/TripUpdates/Rail, <base>/VehiclePositions/Rail and
+// <base>/Alerts.
+func FeedsAt(base string) Feeds {
+	base = strings.TrimRight(base, "/")
+	return Feeds{
+		TripUpdates:      base + "/TripUpdates/Rail",
+		VehiclePositions: base + "/VehiclePositions/Rail",
+		Alerts:           base + "/Alerts",
+	}
 }
 
 // TripRel is the TripDescriptor schedule relationship.

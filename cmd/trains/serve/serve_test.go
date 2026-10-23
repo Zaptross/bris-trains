@@ -71,7 +71,7 @@ func openService(t *testing.T, live bool) *gtfsrail.Service {
 func apiServer(t *testing.T, dev bool) *httptest.Server {
 	t.Helper()
 	svc := openService(t, false)
-	h := newHandler(svc, fstest.MapFS{}, false, dev, slog.New(slog.DiscardHandler))
+	h := newHandler(svc, fstest.MapFS{}, false, dev, slog.New(slog.DiscardHandler), nil)
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	return srv
@@ -236,7 +236,7 @@ func TestUI(t *testing.T) {
 		"index.html":    {Data: []byte("<html>app</html>")},
 		"assets/app.js": {Data: []byte("console.log(1)")},
 	}
-	srv := httptest.NewServer(newHandler(nil, ui, true, false, slog.New(slog.DiscardHandler)))
+	srv := httptest.NewServer(newHandler(nil, ui, true, false, slog.New(slog.DiscardHandler), nil))
 	defer srv.Close()
 	for _, p := range []string{"/", "/trip/abc", "/gallery"} {
 		r := get(t, srv.URL+p)
@@ -257,7 +257,7 @@ func TestUI(t *testing.T) {
 		t.Fatalf("api fallback: %d %s", r.status, r.body)
 	}
 
-	nb := httptest.NewServer(newHandler(nil, ui, false, false, slog.New(slog.DiscardHandler)))
+	nb := httptest.NewServer(newHandler(nil, ui, false, false, slog.New(slog.DiscardHandler), nil))
 	defer nb.Close()
 	for _, p := range []string{"/", "/trip/abc"} {
 		r := get(t, nb.URL+p)
@@ -269,9 +269,9 @@ func TestUI(t *testing.T) {
 
 func TestCORS(t *testing.T) {
 	ui := fstest.MapFS{"index.html": {Data: []byte("x")}}
-	dev := httptest.NewServer(newHandler(nil, ui, true, true, slog.New(slog.DiscardHandler)))
+	dev := httptest.NewServer(newHandler(nil, ui, true, true, slog.New(slog.DiscardHandler), nil))
 	defer dev.Close()
-	prod := httptest.NewServer(newHandler(nil, ui, true, false, slog.New(slog.DiscardHandler)))
+	prod := httptest.NewServer(newHandler(nil, ui, true, false, slog.New(slog.DiscardHandler), nil))
 	defer prod.Close()
 	origin := map[string]string{"Origin": "http://localhost:5173"}
 
@@ -303,7 +303,7 @@ func TestLoadDoesNotTriggerFetches(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	before := svc.Health()
-	srv := httptest.NewServer(newHandler(svc, fstest.MapFS{}, false, false, slog.New(slog.DiscardHandler)))
+	srv := httptest.NewServer(newHandler(svc, fstest.MapFS{}, false, false, slog.New(slog.DiscardHandler), nil))
 	defer srv.Close()
 
 	var wg sync.WaitGroup

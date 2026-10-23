@@ -23,11 +23,28 @@ import (
 
 	"trains/gtfsrail"
 	"trains/gtfsrail/wire"
+	"trains/internal/version"
 	"trains/web"
 )
 
 // FlagNames lists serve-mode flag names without dashes.
-func FlagNames() []string { return []string{"addr", "dev", "cache"} }
+func FlagNames() []string { return []string{"addr", "dev", "cache", "static-url", "feeds-url"} }
+
+// clockFromEnv returns the server's clock. TRAINS_NOW (RFC3339) starts the
+// clock at that instant and lets it advance in real time; CI uses it to serve
+// the committed fixture, whose timetable is dated. Deliberately undocumented.
+func clockFromEnv() (func() time.Time, bool, error) {
+	v := os.Getenv("TRAINS_NOW")
+	if v == "" {
+		return time.Now, false, nil
+	}
+	start, err := time.Parse(time.RFC3339, v)
+	if err != nil {
+		return nil, false, fmt.Errorf("TRAINS_NOW: %w", err)
+	}
+	began := time.Now()
+	return func() time.Time { return start.Add(time.Since(began)) }, true, nil
+}
 
 func defaultCacheDir() string {
 	dir, err := os.UserCacheDir()
@@ -44,8 +61,10 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, queryFlag
 	addr := fset.String("addr", "localhost:8080", "listen address")
 	dev := fset.Bool("dev", false, "allow CORS from http://localhost:* and http://127.0.0.1:* (for the Vite dev server)")
 	cache := fset.String("cache", defaultCacheDir(), "timetable cache directory")
+	staticURL := fset.String("static-url", gtfsrail.DefaultStaticURL, "static GTFS zip `URL`")
+	feedsURL := fset.String("feeds-url", gtfsrail.DefaultFeedsURL, "GTFS-RT base `URL`; feeds are read from <URL>/TripUpdates/Rail, /VehiclePositions/Rail and /Alerts")
 	usage := func(w io.Writer) {
-		fmt.Fprintln(w, "Usage: trains serve [--addr host:port] [--dev] [--cache dir]")
+		fmt.Fprintln(w, "Usage: trains serve [--addr host:port] [--dev] [--cache dir] [--static-url URL] [--feeds-url URL]")
 		fmt.Fprintln(w)
 		fset.SetOutput(w)
 		fset.PrintDefaults()
@@ -77,6 +96,14 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, queryFlag
 	}
 
 	logger := slog.New(slog.NewTextHandler(stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	now, pinned, err := clockFromEnv()
+	if err != nil {
+		logger.Error("bad clock override", "err", err)
+		return 2
+	}
+	if pinned {
+		logger.Warn("clock pinned by TRAINS_NOW", "now", now().Format(time.RFC3339))
+	}
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
 		logger.Error("cannot listen", "addr", *addr, "err", err)
@@ -85,7 +112,8 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, queryFlag
 	defer ln.Close()
 
 	svc, err := gtfsrail.Open(ctx, gtfsrail.Config{
-		CacheDir: *cache, Live: true, ReservedWords: []string{"serve"}, Logger: logger,
+		CacheDir: *cache, StaticURL: *staticURL, Feeds: gtfsrail.FeedsAt(*feedsURL),
+		Live: true, ReservedWords: []string{"serve"}, Logger: logger, Now: now,
 	})
 	if err != nil {
 		logger.Error("cannot open timetable", "err", err)
@@ -97,7 +125,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, queryFlag
 	}
 
 	srv := &http.Server{
-		Handler:           newHandler(svc, web.FS(), web.Built(), *dev, logger),
+		Handler:           newHandler(svc, web.FS(), web.Built(), *dev, logger, now),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	errc := make(chan error, 1)
@@ -140,8 +168,12 @@ const (
 	cacheImmutable = "public, max-age=31536000, immutable"
 )
 
-func newHandler(b backend, ui fs.FS, uiBuilt bool, dev bool, logger *slog.Logger) http.Handler {
-	h := &handler{b: b, log: logger, now: time.Now}
+// newHandler builds the HTTP handler; now defaults to time.Now.
+func newHandler(b backend, ui fs.FS, uiBuilt bool, dev bool, logger *slog.Logger, now func() time.Time) http.Handler {
+	if now == nil {
+		now = time.Now
+	}
+	h := &handler{b: b, log: logger, now: now}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/stations", h.stations)
 	mux.HandleFunc("GET /api/journeys", h.journeys)
@@ -420,6 +452,6 @@ func (h *handler) health(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, cacheNoStore, wire.HealthResponse{
 		TripUpdates: conv(hl.TripUpdates), VehiclePositions: conv(hl.VehiclePositions),
-		Alerts: conv(hl.Alerts), Degraded: hl.Degraded,
+		Alerts: conv(hl.Alerts), Degraded: hl.Degraded, Version: version.String(),
 	})
 }

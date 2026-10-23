@@ -40,6 +40,20 @@ const (
 // FeedURLs are the realtime feed endpoints.
 type FeedURLs struct{ TripUpdates, VehiclePositions, Alerts string }
 
+// Upstream defaults: Translink's SEQ static GTFS zip and GTFS-RT root.
+const (
+	DefaultStaticURL = gtfs.DefaultStaticURL
+	DefaultFeedsURL  = gtfsrt.DefaultBase
+)
+
+// FeedsAt returns the rail feeds under a GTFS-RT base URL laid out like
+// Translink's: <base>/TripUpdates/Rail, <base>/VehiclePositions/Rail and
+// <base>/Alerts.
+func FeedsAt(base string) FeedURLs {
+	f := gtfsrt.FeedsAt(base)
+	return FeedURLs{TripUpdates: f.TripUpdates, VehiclePositions: f.VehiclePositions, Alerts: f.Alerts}
+}
+
 // Config configures Open.
 type Config struct {
 	// CacheDir holds the parsed static index, shared by every process.

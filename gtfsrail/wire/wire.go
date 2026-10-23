@@ -138,6 +138,7 @@ type HealthResponse struct {
 	VehiclePositions FeedHealth `json:"vehiclePositions"`
 	Alerts           FeedHealth `json:"alerts"`
 	Degraded         bool       `json:"degraded"`
+	Version          string     `json:"version"` // of the running binary
 }
 
 // Time formats t as RFC3339 in Australia/Brisbane.

@@ -139,4 +139,6 @@ export interface HealthResponse {
   vehiclePositions: FeedHealth;
   alerts: FeedHealth;
   degraded: boolean;
+  /** Version of the running server binary, e.g. "1.4.2" or "dev+a1b2c3d". */
+  version: string;
 }

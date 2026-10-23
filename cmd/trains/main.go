@@ -14,6 +14,7 @@ import (
 
 	"trains/cmd/trains/query"
 	"trains/cmd/trains/serve"
+	"trains/internal/version"
 )
 
 func main() { os.Exit(run(os.Args[1:])) }
@@ -27,6 +28,10 @@ func run(args []string) int {
 	if len(args) == 0 {
 		fmt.Fprint(os.Stderr, query.Usage)
 		return 2
+	}
+	if args[0] == "--version" || args[0] == "-version" {
+		fmt.Println("trains", version.String())
+		return 0
 	}
 	if args[0] == "serve" {
 		return serve.Run(ctx, args[1:], os.Stdout, os.Stderr, query.FlagNames())
