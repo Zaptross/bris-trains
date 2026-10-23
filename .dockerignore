@@ -1,0 +1,3 @@
+# The image only packages prebuilt Linux binaries; keep the build context tiny.
+*
+!bin/trains-linux-*

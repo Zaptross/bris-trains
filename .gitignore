@@ -7,10 +7,13 @@ scratch/*.err
 node_modules/
 web/dist/*
 !web/dist/.gitkeep
+*.tsbuildinfo
+web/test-results/
+web/playwright-report/
 
 # Built binaries (root-anchored: a bare `trains` would also ignore cmd/trains/)
 /trains
 /trains.exe
-/trainsd
-/trainsd.exe
-*.tsbuildinfo
+/feedserver
+/feedserver.exe
+/bin/

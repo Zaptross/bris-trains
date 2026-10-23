@@ -23,15 +23,15 @@ type STU struct {
 }
 
 type TU struct {
-	EntityID string `json:"entity_id"`
-	TripID   string `json:"trip_id"`
-	RouteID  string `json:"route_id"`
-	StartTS  string `json:"start_time"`
-	StartDT  string `json:"start_date"`
-	SchedRel string `json:"trip_rel"`
+	EntityID string  `json:"entity_id"`
+	TripID   string  `json:"trip_id"`
+	RouteID  string  `json:"route_id"`
+	StartTS  string  `json:"start_time"`
+	StartDT  string  `json:"start_date"`
+	SchedRel string  `json:"trip_rel"`
 	DirID    *uint32 `json:"direction_id,omitempty"`
-	VehID    string `json:"vehicle_id,omitempty"`
-	STUs     []STU  `json:"stus"`
+	VehID    string  `json:"vehicle_id,omitempty"`
+	STUs     []STU   `json:"stus"`
 }
 
 type VP struct {
@@ -49,14 +49,14 @@ type VP struct {
 }
 
 type Alert struct {
-	EntityID string   `json:"entity_id"`
-	Cause    string   `json:"cause"`
-	Effect   string   `json:"effect"`
-	Routes   []string `json:"routes"`
-	Stops    []string `json:"stops"`
-	Trips    []string `json:"trips"`
-	Header   string   `json:"header"`
-	Desc     string   `json:"desc"`
+	EntityID string      `json:"entity_id"`
+	Cause    string      `json:"cause"`
+	Effect   string      `json:"effect"`
+	Routes   []string    `json:"routes"`
+	Stops    []string    `json:"stops"`
+	Trips    []string    `json:"trips"`
+	Header   string      `json:"header"`
+	Desc     string      `json:"desc"`
 	Periods  [][2]uint64 `json:"periods"`
 }
 

@@ -1,0 +1,336 @@
+# Staged CI for trains.
+#
+# Every push and pull request:   version ─┬─> unit ────────┐
+#                                         └─> integration ─┴─> build (host binary)
+#
+# main additionally:             build (7 binaries) ─> smoke ─> docker ─> release
+#                                                  └─> live (informational, never blocks)
+#
+# Versions come from conventional commits (paulhatch/semantic-version, one bump
+# per commit). Only main publishes: a v-tag + GitHub Release with the binaries,
+# and a multi-arch image on ghcr.io/<owner>/<repo>.
+name: CI
+
+on:
+  push:
+    branches: ["**"] # branch pushes only; the release job's tags don't trigger a run
+  pull_request:
+
+permissions:
+  contents: read
+
+# main runs queue rather than cancel, so each one sees the previous run's tag
+# and versions never collide. Other refs cancel superseded runs.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  NODE_VERSION: "22"
+  # The fixture's realtime capture time; its timetable runs Thu 22 Oct to
+  # 13 Nov 2026, so the smoke server's clock is pinned inside that window.
+  FIXTURE_NOW: "2026-10-23T00:04:00+10:00"
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      # What the binaries report: X.Y.Z on main, X.Y.Z-dev.<sha> elsewhere.
+      build_version: ${{ steps.build_version.outputs.value }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the version is computed from the full history and tags
+          persist-credentials: false
+      - uses: paulhatch/semantic-version@a8f8f59fd7f0625188492e945240f12d7ad2dca3 # v5.4.0
+        id: get_version
+        with:
+          tag_prefix: "v"
+          # Anchored to the conventional-commit header so only the type
+          # decides the bump: "feat!:" / "fix(x)!:" is major; feat, refactor,
+          # revert and style are minor; everything else is patch. Subjects
+          # only (search_commit_body defaults to false).
+          major_pattern: "/^[a-z]+(\\(.+\\))?!:/"
+          minor_pattern: "/^(feat|refactor|revert|style)(\\(.+\\))?:/"
+          # Your "format" setting under its v5 input name; v5 ignores the old
+          # key with an "Unexpected input" warning.
+          version_format: "${major}.${minor}.${patch}"
+          bump_each_commit: true
+      - id: build_version
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          IS_MAIN: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+        run: |
+          if [ "$IS_MAIN" = true ]; then v="$VERSION"; else v="$VERSION-dev.${SHA::7}"; fi
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+          echo "### Version \`$v\`" >> "$GITHUB_STEP_SUMMARY"
+
+  unit:
+    name: Unit tests + lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --prefix web
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then echo "Not gofmt-formatted:"; echo "$unformatted"; exit 1; fi
+      - name: go vet (including live-tagged tests)
+        run: go vet ./... && go vet -tags live ./...
+      - name: TypeScript (strict, includes smoke tests)
+        run: npm --prefix web run typecheck
+      - name: Unit tests
+        # Everything except the merge-engine golden tests and the HTTP server,
+        # which run in the integration job.
+        run: |
+          mapfile -t pkgs < <(go list ./... | grep -vxE 'trains/gtfsrail|trains/cmd/trains/serve')
+          go test -race -count=1 "${pkgs[@]}"
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Merge-engine golden tests + HTTP server tests
+        run: go test -race -count=1 ./gtfsrail ./cmd/trains/serve
+
+  build:
+    name: Build
+    needs: [version, unit, integration]
+    runs-on: ubuntu-latest
+    env:
+      IS_MAIN: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the web UI (embedded into the binary)
+        run: npm ci --prefix web && npm --prefix web run build
+      - name: Build binaries
+        env:
+          VERSION: ${{ needs.version.outputs.build_version }}
+        run: |
+          if [ "$IS_MAIN" = true ]; then
+            targets="linux/amd64 linux/arm64 linux/arm/7 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64"
+          else
+            targets="linux/amd64" # branches and PRs prove the host build only
+          fi
+          mkdir -p bin
+          for t in $targets; do
+            IFS=/ read -r goos goarch goarm <<< "$t"
+            name="trains-$goos-$goarch${goarm:+v$goarm}"
+            [ "$goos" = windows ] && name="$name.exe"
+            echo "::group::$name"
+            CGO_ENABLED=0 GOOS=$goos GOARCH=$goarch GOARM=$goarm \
+              go build -trimpath -ldflags "-s -w -X trains/internal/version.Version=$VERSION" \
+              -o "bin/$name" ./cmd/trains
+            echo "::endgroup::"
+          done
+          ls -l bin
+      - name: Check the binary reports its version
+        env:
+          VERSION: ${{ needs.version.outputs.build_version }}
+        run: test "$(bin/trains-linux-amd64 --version)" = "trains $VERSION"
+      - if: env.IS_MAIN == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: binaries
+          path: bin/
+          if-no-files-found: error
+          retention-days: 1
+
+  smoke:
+    name: Smoke tests (fixtures)
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: binaries
+          path: bin
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --prefix web && cd web && npx playwright install --with-deps chromium
+      - name: Serve the release binary from the committed fixtures
+        run: |
+          chmod +x bin/trains-linux-amd64
+          go build -o feedserver ./cmd/feedserver
+          ./feedserver -addr localhost:8091 > feedserver.log 2>&1 &
+          TRAINS_NOW="$FIXTURE_NOW" bin/trains-linux-amd64 serve --addr localhost:8080 --cache "$RUNNER_TEMP/trains-cache" \
+            --static-url http://localhost:8091/GTFS/SEQ_GTFS.zip \
+            --feeds-url http://localhost:8091/api/realtime/SEQ > trains.log 2>&1 &
+          curl -fsS --retry 30 --retry-connrefused --retry-delay 1 http://localhost:8080/api/healthz
+      - name: Smoke test every page
+        env:
+          SMOKE_BASE_URL: http://localhost:8080
+          SMOKE_NOW: ${{ env.FIXTURE_NOW }}
+        run: npm --prefix web run smoke
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: smoke-report
+          path: |
+            web/playwright-report/
+            web/test-results/
+            trains.log
+            feedserver.log
+          retention-days: 7
+
+  live:
+    name: Live feeds (informational)
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [build]
+    runs-on: ubuntu-latest
+    # Upstream drift shows up here without blocking a release: nothing needs
+    # this job, and its failure doesn't fail the workflow.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: binaries
+          path: bin
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Live-tagged Go tests (full static feed + realtime conditional GETs)
+        run: |
+          mkdir -p scratch
+          curl -fsSL -o scratch/SEQ_GTFS.zip https://gtfsrt.api.translink.com.au/GTFS/SEQ_GTFS.zip
+          go test -count=1 -tags live -run Live ./...
+      - run: npm ci --prefix web && cd web && npx playwright install --with-deps chromium
+      - name: Serve the release binary from the live feeds
+        run: |
+          chmod +x bin/trains-linux-amd64
+          bin/trains-linux-amd64 serve --addr localhost:8080 --cache "$RUNNER_TEMP/trains-cache" > trains.log 2>&1 &
+          curl -fsS --retry 60 --retry-connrefused --retry-delay 1 http://localhost:8080/api/healthz
+      - name: Smoke test every page against live data
+        env:
+          SMOKE_BASE_URL: http://localhost:8080
+        run: npm --prefix web run smoke
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: live-report
+          path: |
+            web/playwright-report/
+            web/test-results/
+            trains.log
+          retention-days: 7
+
+  docker:
+    name: Container image
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [version, smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: binaries
+          path: bin
+      - name: Image name (ghcr requires lowercase)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        id: meta
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}},value=v${{ needs.version.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ needs.version.outputs.version }}
+            type=semver,pattern={{major}},value=v${{ needs.version.outputs.version }}
+            type=sha
+            type=raw,value=latest
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  release:
+    name: GitHub Release
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [version, docker]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # release notes need the commits since the previous tag
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: binaries
+          path: bin
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Checksums and release notes
+        env:
+          TAG: v${{ needs.version.outputs.version }}
+        run: |
+          (cd bin && sha256sum trains-* > SHA256SUMS)
+          node scripts/release-notes.mjs --to "$GITHUB_SHA" --compare-to "$TAG" > notes.md
+          cat notes.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Tag and publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v${{ needs.version.outputs.version }}
+        run: gh release create "$TAG" bin/* --target "$GITHUB_SHA" --title "$TAG" --notes-file notes.md
