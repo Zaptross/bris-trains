@@ -168,3 +168,7 @@ SMOKE_BASE_URL=http://localhost:8080 SMOKE_NOW=2026-10-23T00:04:00+10:00 npm run
 | Release | main, after the image | tags `vX.Y.Z` and publishes the binaries, `SHA256SUMS` and grouped release notes |
 
 Every commit on main bumps the version, decided by its conventional-commit type alone: `type!:` is major; `feat`, `refactor`, `revert` and `style` are minor; anything else is patch. Only the subject's type prefix counts, so a breaking change must be written `feat!:` or `fix(scope)!:`; a `BREAKING CHANGE:` footer is not read. Main runs queue rather than cancel, so each one sees the previous release's tag.
+
+## Licence
+
+The code is [MIT](LICENSE). The transit data is not: Translink's data in `testdata/` and `scratch/` stays under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [`testdata/README.md`](testdata/README.md) and [`scratch/README.md`](scratch/README.md) list each file's source and what was changed. Release binaries and the container image contain no Translink data; the timetable is downloaded at runtime.
