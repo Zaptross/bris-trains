@@ -26,7 +26,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
-  NODE_VERSION: "22"
+  NODE_VERSION: "26"
   # The fixture's realtime capture time; its timetable runs Thu 22 Oct to
   # 13 Nov 2026, so the smoke server's clock is pinned inside that window.
   FIXTURE_NOW: "2026-10-23T00:04:00+10:00"
@@ -211,6 +211,7 @@ jobs:
             trains.log
             feedserver.log
           retention-days: 7
+          if-no-files-found: ignore
 
   live:
     name: Live feeds (informational)
@@ -236,7 +237,12 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: web/package-lock.json
+      # The Go tests and the smoke suite check different things (upstream data
+      # vs the UI), so a Go failure must not skip the smoke suite. The step
+      # carries on and the job fails at the end instead.
       - name: Live-tagged Go tests (full static feed + realtime conditional GETs)
+        id: gotests
+        continue-on-error: true
         run: |
           mkdir -p scratch
           curl -fsSL -o scratch/SEQ_GTFS.zip https://gtfsrt.api.translink.com.au/GTFS/SEQ_GTFS.zip
@@ -251,6 +257,11 @@ jobs:
         env:
           SMOKE_BASE_URL: http://localhost:8080
         run: npm --prefix web run smoke
+      - name: Fail the job if the live Go tests failed
+        if: steps.gotests.outcome == 'failure'
+        run: |
+          echo "::error::Live-tagged Go tests failed; see the 'Live-tagged Go tests' step log."
+          exit 1
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -260,6 +271,7 @@ jobs:
             web/test-results/
             trains.log
           retention-days: 7
+          if-no-files-found: ignore
 
   docker:
     name: Container image

@@ -21,7 +21,7 @@ Rail only (South East Queensland). Data © Translink, licensed [CC BY 4.0](https
 
 ## Build
 
-Requires Go 1.26+ and Node 22+.
+Requires Go 1.26+ and Node 24+ (CI uses 26).
 
 ```sh
 npm --prefix web ci
